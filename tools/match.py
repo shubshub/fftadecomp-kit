@@ -4063,6 +4063,8 @@ class BufferCallProof:
             # only in a replay, and only on that rule's retried proofs; each path then carries its
             # row-site execution counts as one more state element.
             bounded = self.store_bounds.sites(address) if replay and self.store_bounds is not None else {}
+            # ... and the replayed state graph of this walk, which must verify the call, not only the premise.
+            bound_call = self.store_bounds.call(address, site) if bounded else None
             if replay:
                 # Exact path-by-path replay: no joins, known counters and CMP flags
                 # prune infeasible branches, so a loop is unrolled to its proven
@@ -4106,8 +4108,8 @@ class BufferCallProof:
                     next_counts = states[current][6]
                     if current in bounded:
                         counts = dict(next_counts)
-                        if not self.store_bounds.step(self, address, site, instruction, aliases, stack, counts,
-                                                      bounded[current]):
+                        if not bound_call.step(self, instruction, aliases, stack, counts, bounded[current],
+                                               (current, incoming_state)):
                             continue        # this path ends before the store (store_bound_premise_profile)
                         next_counts = tuple(sorted(counts.items()))
                 if self.callee_frames:
@@ -4345,6 +4347,8 @@ class BufferCallProof:
                         returned_words = words if returned_words is None else {
                             slot: joined for slot, value in returned_words.items()
                             if (joined := join_word(value, words.get(slot))) is not None}
+                    if bound_call is not None:
+                        bound_call.returned((current, incoming_state))
                     successors = ()
                 elif instruction.id == ARM_INS_B:
                     successors = (operands[0].imm,)
@@ -4382,6 +4386,8 @@ class BufferCallProof:
                     outgoings = [outgoing]
                 for successor, outgoing in ((target, state) for target in successors for state in outgoings):
                     if replay:
+                        if bound_call is not None:
+                            bound_call.edge((current, incoming_state), (successor, outgoing))
                         seen = replay_states.setdefault(successor, set())
                         if any(state[1] != depth for state in seen):
                             raise ValueError("inconsistent stack depth at control-flow join")
@@ -4436,6 +4442,9 @@ class BufferCallProof:
                         if merged != previous:
                             states[successor] = merged
                             pending.append(successor)
+            if bound_call is not None:
+                current = None      # a refusal here is about the whole walk, not one instruction
+                bound_call.finish()
             if self.callee_frames:
                 self.complete_frame(address, data, instructions)
             if path_states is not None:

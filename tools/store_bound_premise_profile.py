@@ -33,6 +33,16 @@ run again with a `StoreBounds` attached (`proof.store_bounds`), in two passes:
    ends there, before the store, and its replay state is counted as pruned.  Every execution up to the bound is the
    ordinary replayed store with all its checks.  Each row must prune at least one path.
 
+A row states a count, never reachability ("this store, or this call, never runs").  So a bound below 1
+is refused, in the file and when the frame allows none at a site's first execution (with no entry
+printed).  And in the prune pass each replayed walk of a row callee keeps its state graph
+(`CallBounds`): the walk is refused when no path of the call returns and some end at a bound, or when,
+from a state in which a row store runs for the first time on its path, no continuation returns and
+some end at a bound.  The replay follows both ways of every branch its known values leave open, so the
+code itself then runs a row store past its bound whenever that store runs, and the row would assert
+that the state never occurs.  A bound reached only after a later execution stays a count (the code
+allows fewer executions) and is admitted.
+
 A missing or differing entry refuses and prints the entry to review, with the largest bounds the
 frame allows; the reviewer proves each bound from the ROM (or a smaller one) and shows it before it
 ships (user ruling of 2026-11-27 on stack-store premises: "admit if proved, shown to me").
@@ -45,9 +55,9 @@ grows).  Nothing else is premised: no alias is dropped, stores up to the bound a
 store at any other site keeps its checks and its refusal.
 
 Scope: rows apply only inside the bounded loop replay of an inspected callee (never to the owner's
-own instructions), only to the plain default stack-argument walk (the data-buffer and
-function-buffer proofs refuse as before), and only behind `POLICY` (disabled: the trigger is raised
-unchanged).
+own instructions), only to the default stack-argument walk of match.py's plain path and of the
+composed data-buffer proof (and their replays), and only behind `POLICY` (disabled: the trigger is
+raised unchanged).
 """
 import hashlib
 import json
@@ -130,8 +140,8 @@ def parse_entry(premises, owner):
     rows = {}
     for row in entry['rows']:
         if type(row) is not dict or set(row) != {'callee', 'site', 'bound'} or type(row['bound']) is not int or \
-                row['bound'] < 0:
-            raise ValueError(f'store bound: a row of 0x{owner:08X} is not {{callee, site, bound >= 0}}')
+                row['bound'] < 1:
+            raise ValueError(f'store bound: a row of 0x{owner:08X} is not {{callee, site, bound >= 1}}')
         key = (hexword(row['callee'], 'row callee'), hexword(row['site'], 'row site'))
         if key in rows:
             raise ValueError(f'store bound: the entry 0x{owner:08X} repeats a row')
@@ -156,7 +166,7 @@ class StoreBounds:
         self.owner = owner
         self.bounds = dict(bounds)
         self.measure = all(bound is None for bound in self.bounds.values())
-        if not self.measure and any(type(bound) is not int or bound < 0 for bound in self.bounds.values()):
+        if not self.measure and any(type(bound) is not int or bound < 1 for bound in self.bounds.values()):
             raise ValueError('store bound: a pass either measures every row or bounds every row')
         # (callee, site): least earlier execution count at a refusing store (measure pass)
         self.refusing = {}
@@ -166,6 +176,10 @@ class StoreBounds:
     def sites(self, callee):
         """{site: bound} of the rows of ``callee``; empty when none."""
         return {site: bound for (row_callee, site), bound in self.bounds.items() if row_callee == callee}
+
+    def call(self, callee, call_site):
+        """The bookkeeping of one replayed walk of the row callee ``callee`` called at ``call_site``."""
+        return CallBounds(self, callee, call_site)
 
     def snapshot(self):
         return dict(self.refusing), dict(self.pruned)
@@ -206,6 +220,77 @@ class StoreBounds:
         return True
 
 
+class CallBounds:
+    """One replayed walk of a row callee.  On the prune pass it keeps the walk's state graph, whose
+    nodes are the replay's (address, state) pairs, so that ``finish`` can refuse a walk that verifies
+    the premise instead of the call:
+
+    * no path of the call returns, and some end at a bound; or
+    * the code itself runs a row store past its bound: from a state in which a row store runs for the
+      first time on its path, no replayed continuation returns and some end at a bound.  The row would
+      then assert that the state never occurs, which is a reachability premise (as a bound of 0 would
+      be), not a count.
+
+    The replay explores both ways of every branch its known values leave open, so "no continuation
+    returns" holds for every input: the overrun is forced by the code, not by the unknown values.
+    """
+
+    def __init__(self, bounds, callee, call_site):
+        self.bounds, self.callee, self.call_site = bounds, callee, call_site
+        self.record = not bounds.measure
+        self.successors = {}
+        self.returns = set()
+        self.prunes = set()
+        self.first = {}     # node: row site, where that store runs for the first time on the path
+
+    def step(self, proof, instruction, aliases, stack, counts, bound, node):
+        """``StoreBounds.step`` at ``node``."""
+        first = instruction.address not in counts
+        if not self.bounds.step(proof, self.callee, self.call_site, instruction, aliases, stack, counts, bound):
+            if self.record:
+                self.prunes.add(node)
+            return False
+        if self.record and first:
+            self.first[node] = instruction.address
+        return True
+
+    def edge(self, node, successor):
+        if self.record:
+            self.successors.setdefault(node, []).append(successor)
+
+    def returned(self, node):
+        if self.record:
+            self.returns.add(node)
+
+    def finish(self):
+        if not self.record or not self.prunes:
+            return
+        where = f'0x{self.callee:08X} (called at 0x{self.call_site:08X})'
+        if not self.returns:
+            raise ValueError(f'store bound: no replayed path of {where} returns and {len(self.prunes)} end at a '
+                             f'bound: the walk would verify the premise, not the call')
+        predecessors = {}
+        for node, targets in self.successors.items():
+            for target in targets:
+                predecessors.setdefault(target, []).append(node)
+
+        def reaching(ends):
+            seen, work = set(ends), list(ends)
+            while work:
+                for node in predecessors.get(work.pop(), ()):
+                    if node not in seen:
+                        seen.add(node)
+                        work.append(node)
+            return seen
+        completes, overruns = reaching(self.returns), reaching(self.prunes)
+        forced = [site for node, site in self.first.items() if node in overruns and node not in completes]
+        if forced:
+            stores = ', '.join(f'0x{site:08X}' for site in sorted(set(forced)))
+            raise ValueError(f'store bound: in {where}, once the store at {stores} first runs no replayed '
+                             f'continuation returns and some end at a bound: the code itself runs a row store '
+                             f'more often than its row allows')
+
+
 def run_pass(make_proof, run, data, address, index_premises, bounds):
     import default_stack_index_profile as default_index
 
@@ -243,6 +328,12 @@ def retry(error, make_proof, run, data, address, index_premises, premises):
     frame = dict(sorted(measured.store_bounds.refusing.items()))
     if trigger not in frame:
         raise error
+    first = sorted(key for key, bound in frame.items() if bound < 1)
+    if first:
+        callee, site = first[0]
+        raise ValueError(f'{error}; default store-bound retry: store bound: the store at 0x{site:08X} in '
+                         f'0x{callee:08X} leaves the allocated local words at its first execution on a replayed '
+                         f'path; a bound below 1 is not admitted')
     suggested = {key: min(reviewed.get(key, bound), bound) for key, bound in frame.items()}
     differs = None
     if entry is None:
