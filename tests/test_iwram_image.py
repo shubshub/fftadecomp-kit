@@ -320,6 +320,82 @@ class IwramImageTests(unittest.TestCase):
         self.assertEqual({target for _, target in proof.iwram_image_calls},
                          {DESTINATION + self.symbols["img_quiet"] - SOURCE})
 
+    def with_inner_call(self, entry, fetch=None):
+        """The 0x08005B6C -> 0x08005954 shape: the owner keeps its frame in R4 across a call that
+        passes no stack address, so only the callee-saved walk follows it; the callee copies R4 into
+        R3 and calls an image routine through _call_via_r2 with R2 read from the ROM table."""
+        body = ("push {r4, lr}\nsub sp, #8\nmov r4, sp\nbl func_f\nmovs r3, #0\nstr r3, [r4]\n"
+                "add sp, #8\npop {r4}\npop {r0}\nbx r0\n.ltorg")
+        fetch = fetch or f"ldr r0, =0x{TABLE:08X}\nldr r2, [r0, #{4 * ENTRIES.index(entry)}]"
+        inner = (f"push {{lr}}\nadds r3, r4, #0\n{fetch}\n"
+                 f"ldr r0, =0x02000000\nmovs r1, #8\nbl 0x{R2:08X}\nmovs r3, #0\npop {{r0}}\nbx r0\n.ltorg")
+        text = assembly(body).replace(
+            "owner_end:\n", f"owner_end:\n.balign 4\n.global func_f, func_f_end\nfunc_f:\n{inner}\nfunc_f_end:\n", 1)
+        (self.root / "f.s").write_text(text)
+        self.build_text()
+        self.entries.append({"rom": f"0x{self.symbols['func_f']:08X}", "end": f"0x{self.symbols['func_f_end']:08X}",
+                             "mode": "thumb"})
+        from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB
+        start, end = self.symbols["func_f"], self.symbols["func_f_end"]
+        (site,) = [instruction.address for instruction in Cs(CS_ARCH_ARM, CS_MODE_THUMB).disasm(
+            bytes(self.rom[start - BASE:end - BASE]), start) if instruction.op_str == f"#0x{R2:x}"]
+        return site
+
+    def test_the_callee_saved_walk_resolves_a_call_into_the_image(self):
+        site = self.with_inner_call("img_clear")
+        proof = self.prove()
+        self.assertEqual(proof.iwram_image_calls, set())            # the buffer walks never met the call
+        self.assertEqual(iwram.calls(proof), {(site, DESTINATION)})
+        line, = iwram.lines(proof)
+        self.assertIn(f"calls 0x{site:08X} -> 0x{DESTINATION:08X}", line)
+        self.assertIn(line, proof.loop_replay_lines())
+        # It is walked over the image bytes: a routine that writes through R3 or clobbers R4 refuses.
+        for entry in ("img_far", "img_r4"):
+            with self.subTest(entry=entry):
+                self.with_inner_call(entry)
+                with self.assertRaises(ValueError):
+                    self.prove()
+        # An even value or one outside the image is not resolved: the call keeps its refusal.
+        for value in (DESTINATION, DESTINATION + 0x1001):
+            with self.subTest(value=hex(value)):
+                self.with_inner_call("img_clear", fetch=f"ldr r2, =0x{value:08X}")
+                with self.assertRaisesRegex(ValueError, "receives an owner stack address in R3"):
+                    self.prove()
+        # Without the hook the call stays an indirect call that receives an owner stack address.
+        self.with_inner_call("img_clear")
+        with patch.object(iwram, "watch_target", lambda proof: None), \
+                self.assertRaisesRegex(ValueError, "receives an owner stack address in R3"):
+            self.prove()
+
+    def test_a_crossed_image_call_is_walked_over_the_image(self):
+        # The call-via target rule's crossing check: the callback's fact in R4 crosses an image call the
+        # buffer walks do not inspect and is then called with the owner's frame.  The crossed call is
+        # checked by a callee-saved walk of its own (call_via_target_profile.crossing_premises), which
+        # resolves the image the same way: the routine is walked, not stated as an unresolved call.
+        r3 = match.RUNTIME_HELPERS["_call_via_r3"]
+        body = (f"push {{r4, lr}}\nsub sp, #8\nldr r4, =callback + 1\nadds r3, r4, #0\nldr r0, =0x{TABLE:08X}\n"
+                f"ldr r2, [r0]\nldr r0, =0x02000000\nmovs r1, #8\nbl 0x{R2:08X}\nmov r0, sp\nadds r3, r4, #0\n"
+                f"bl 0x{r3:08X}\nadd sp, #8\npop {{r4}}\npop {{r0}}\nbx r0\n.ltorg")
+        text = assembly(body).replace("owner_end:\n", "owner_end:\n.balign 4\n.global callback, callback_end\n"
+                                      "callback:\nmovs r1, #1\nstrh r1, [r0]\nbx lr\ncallback_end:\n", 1)
+        (self.root / "f.s").write_text(text)
+        self.build_text()
+        self.entries.append({"rom": f"0x{self.symbols['callback']:08X}",
+                             "end": f"0x{self.symbols['callback_end']:08X}", "mode": "thumb"})
+        site = self.site()
+        proof = self.prove()
+        self.assertEqual(proof.iwram_image_calls, set())
+        self.assertEqual(iwram.calls(proof), {(site, DESTINATION)})
+        self.assertIn(self.symbols["callback"], proof.dependencies)
+        premised = [line for line in call_via.lines(proof) if line.startswith(call_via.PREMISE_LINE)]
+        self.assertFalse([line for line in premised if f"call at 0x{site:08X}" in line], premised)
+        # Without the image the crossing checker can only state the image call as an unresolved one.
+        with patch.object(iwram, "watch_target", lambda proof: None):
+            unresolved = self.prove()
+        self.assertEqual(iwram.calls(unresolved), set())
+        self.assertTrue([line for line in call_via.lines(unresolved) if line.startswith(call_via.PREMISE_LINE) and
+                         f"call at 0x{site:08X}" in line], call_via.lines(unresolved))
+
     def test_values_outside_the_image_or_even_keep_the_refusal(self):
         for value in (DESTINATION, DESTINATION - 1, DESTINATION + 0x1001, 0x03007001):
             with self.subTest(value=hex(value)):
@@ -368,6 +444,72 @@ class IwramImageTests(unittest.TestCase):
         iwram.resolver(proof, OWNER, 2, DESTINATION + 1)
         proof._restore_ledgers(saved)
         self.assertEqual(proof.iwram_image_calls, set())
+
+
+BUFFER_ONLY = """typedef unsigned short u16;
+extern void func_08000400(u16 value, u16 *out);
+u16 func_08000200(u16 value)
+{
+    u16 buffer[4];
+
+    func_08000400(value, buffer);
+    return buffer[0] + buffer[3];
+}
+"""
+# The callee keeps the owner's buffer in R3 across a call of the image's clear through _call_via_r2,
+# with R2 read from the ROM table: the 0x08005954 shape, reached from natural C.
+IMAGE_CALLER = (f"push {{lr}}\nadds r3, r1, #0\nldr r0, =0x{TABLE:08X}\nldr r2, [r0]\nldr r0, =0x02000000\n"
+                f"movs r1, #8\nbl 0x{R2:08X}\nmovs r3, #0\npop {{r0}}\nbx r0\n.align 2\n.ltorg")
+
+try:
+    from test_data_buffer_calls import A, build as data_buffer_tree, run as run_match, tools_present
+    from test_call_via_targets import index_thunks
+    import match_evidence
+except ImportError:            # pragma: no cover - the sibling fixtures are part of the suite
+    tools_present = lambda: False
+
+
+@unittest.skipUnless(tools_present(), "fixed compiler and ARM tools required")
+class SubprocessTests(unittest.TestCase):
+    def test_the_rule_applies_at_issuance_and_in_replay(self):
+        # match.py as a subprocess issues the report as __main__ and the replay rebuilds the proof:
+        # the report states the image and replays, and fails to replay without that line.
+        scratch = Path(os.environ.get("FFTA_TEST_SCRATCH", ROOT / "build"))
+        scratch.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="iwram_image_sub_", dir=scratch) as directory:
+            directory = Path(directory)
+            image = IwramImageTests("test_the_boot_copy_is_derived_from_the_rom")
+            image.root = directory / "image"
+            image.root.mkdir()
+            image.build("bx lr")
+            root = index_thunks(data_buffer_tree(directory / "tree", BUFFER_ONLY,
+                                                 [("func_08000400", IMAGE_CALLER)], large=True))
+            rom = bytearray((root / "baserom.bin").read_bytes())
+            entries = json.loads((root / "config/functions.json").read_text())
+            owner_end = max(int(entry["end"], 16) for entry in entries if int(entry["rom"], 16) == A)
+            # The boot path, the copier and the image source, and the ROM table, from the fixture.
+            for low, high in ((0, A - BASE), (owner_end - BASE, 0x400), (0x2700, SOURCE - BASE + 0x200),
+                              (TABLE - BASE, TABLE - BASE + 0x10)):
+                rom[low:high] = image.rom[low:high]
+            (root / "baserom.bin").write_bytes(bytes(rom))
+            entries += [{"rom": f"0x{image.symbols['leaf']:08X}", "end": f"0x{image.symbols['leaf'] + 4:08X}",
+                         "mode": "thumb"},
+                        {"rom": f"0x{image.symbols['boot']:08X}", "end": "0x08002768", "mode": "thumb"},
+                        {"rom": "0x08002768", "end": "0x080027B0", "mode": "thumb"}]
+            (root / "config/functions.json").write_text(json.dumps(entries))
+            (root / "symbols/functions.txt").write_text("".join(
+                f"{int(e['rom'], 16):08X} {int(e['end'], 16):08X} {int(e['end'], 16) - int(e['rom'], 16)} 0 return\n"
+                for e in entries))
+            self.assertIsNotNone(iwram.derive(bytes(rom), entries))
+            code, output, text = run_match(root)
+            self.assertEqual(code, 0, output[-2000:])
+            lines = [line for line in text.splitlines() if line.startswith(iwram.FIELD + ":")]
+            self.assertEqual(len(lines), 1, text)
+            self.assertIn(f"-> 0x{DESTINATION:08X}", lines[0])
+            with patch.dict(os.environ, FFTA_ROM=str(root / "baserom.bin")):
+                self.assertTrue(match_evidence.report_matches(text, root, A))
+                edited = "".join(line + "\n" for line in text.splitlines() if not line.startswith(iwram.FIELD))
+                self.assertFalse(match_evidence.report_matches(edited, root, A))
 
 
 class IssuingCopyTests(unittest.TestCase):
