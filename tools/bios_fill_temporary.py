@@ -58,7 +58,14 @@ holds:
    word and the value its RTL store writes, and the BL reaches the fill's BIOS call.  (agbcc may keep a constant in
    a callee-saved register across calls and copy it from there; the path does not show that constant, and 5 reads it
    off the RTL.)  A path is the straight line before the BL, back to a branch target, a branch, a call, or a change
-   of sp.  When that line starts at a branch target and holds no access to the slot r0 points at, the paths are
+   of sp.  A path that shows no access to the slot may take the slot's address from a callee-saved register (r4-r11)
+   it reads before writing: agbcc may form the address once and keep it there across branches, loops and calls.
+   The register is taken as sp+K when every route into the path, walked backwards on the ROM's control-flow graph,
+   reaches a write of it whose own straight line makes it sp+K, with one K for all, before any other write of it,
+   any change of sp, a SWI or the function's entry; and when every call those routes cross passes kit #350's
+   callee-saved check (callee_saved_watch, Carrier), which walks the callee and requires the register and SP
+   returned unchanged and no bit of the register used.  The record names the register, its forming sites, the
+   calls and the premises that check states.  When that line starts at a branch target and holds no access to the slot r0 points at, the paths are
    instead each of the target's predecessors (the fall-through, which may not be a call, every B and B<cond> to it,
    and every far jump to it: agbcc's long branch, a BL the listing marks `@ far jump` to a branch target of the
    function; a BL to the function's entry is a recursive call, which returns), read the same way and followed by the
@@ -77,6 +84,7 @@ call's bytes and the digests of R's code and of each variant's.
 """
 from collections import Counter
 from hashlib import sha256
+import json
 import os
 from pathlib import Path
 import re
@@ -101,6 +109,13 @@ MAX_GROUPS = 8
 ACCESS_WIDTHS = {"str": 4, "ldr": 4, "strh": 2, "ldrh": 2, "ldrsh": 2, "strb": 1, "ldrb": 1, "ldrsb": 1}
 MAX_WINDOW = 64
 MAX_PATHS = 8
+# a fill slot's address carried in a callee-saved register (Carrier): the instructions the routes into a path may
+# visit, and the calls they may cross
+MAX_CARRY = 2048
+MAX_CARRY_CALLS = 64
+# capstone's names of the callee-saved registers r4-r11, by number
+CALLEE_SAVED = {"r4": 4, "r5": 5, "r6": 6, "r7": 7, "r8": 8, "r9": 9, "sb": 9, "r10": 10, "sl": 10, "r11": 11,
+                "fp": 11}
 TOKEN = re.compile(r"[A-Za-z_]\w*|0[xX][0-9A-Fa-f]+[uUlL]*|[0-9]+[uUlL]*|##|->|<<|>>|&&|\|\||[-+*/%&|^!=<>]=|\S")
 DEFINE = re.compile(r"#[ \t]*define[ \t]+(?P<name>[A-Za-z_]\w*)\((?P<params>[^()]*)\)")
 
@@ -757,10 +772,51 @@ def far_jumps(listing):
     return found
 
 
-def rom_fill(rom, address, compiled, fill, found=None):
+class Carrier:
+    """kit #350's callee-saved walk (callee_saved_watch.Checker) of the calls a fill slot's address crosses in a
+    callee-saved register.  agbcc may form the address once, keep it in r4-r11 across branches, loops and calls,
+    and copy it to r0 at the BL.  "Callee-saved" obliges a callee only to restore the register, not to leave its
+    value unused, so each call is walked: it must return the register (and SP) unchanged, and no bit of it may
+    reach a use there or in the caller's code after it.  What the walk cannot see (code outside the ROM, a SWI,
+    an indexed stack access) it admits under the premises it states, which the record prints."""
+
+    def __init__(self, rom, entries, address):
+        self.rom, self.entries, self.address = rom, entries, address
+
+    def check(self, number, sites):
+        """the premise and fact texts of the walks of the calls at sites made while r<number> holds the slot's
+        address; ProofError when any walk refuses"""
+        if not sites:
+            return []
+        import callee_saved_watch as watch
+        context = watch.Context(self.rom, self.entries)
+        checker = watch.checker_for(context)
+        for site in sites:
+            target = proof.decode_bl(self.rom, site)
+            if target is None:
+                raise ProofError(f"{site:08X} is no BL")
+            try:
+                checker.call(target, {number}, caller=self.address, site=site)
+            except Exception as refusal:        # any refusal: the register is not proved preserved and unused
+                raise ProofError(f"the callee-saved check refuses the call at {site:08X} while r{number} holds the "
+                                 f"slot's address: {refusal}") from None
+        texts = []
+        for line in watch.premise_lines(context):
+            for prefix, kind in ((watch.PREMISE_PREFIX, "premise"), (watch.FACT_PREFIX, "fact")):
+                if line.startswith(prefix):
+                    texts.append(f"{kind}: {line[len(prefix):].strip()}")
+                    break
+            else:
+                raise ProofError(f"the callee-saved check states a line of no known kind: {line}")
+        return sorted(texts)
+
+
+def rom_fill(rom, address, compiled, fill, found=None, carrier=None):
     """(BL site, slot offset from sp, the site forming its address, the branch targets its path joins at, each
     (target, predecessor)) of one fill, read off R's code (the ROM's); found is every fill of the function, of
-    which those sharing the fill's BL are read with it"""
+    which those sharing the fill's BL are read with it.  With a Carrier, a path that shows no access to the slot
+    may take the slot's address from a callee-saved register formed before calls (carried); fill["carried"]
+    states it for the record"""
     _, base, size, _ = compiled["text"]
     instructions, labels = compiled["layout"]
     found = [fill] if found is None else found
@@ -888,8 +944,13 @@ def rom_fill(rom, address, compiled, fill, found=None):
             raise ProofError(f"{where(previous):08X} does not fall through to the branch target at {label:08X}")
         return ([] if ends else [previous]) + flow.get(label, [])
 
-    def read(path):
+    def read(path, seeds=None):
+        """the stack addresses the path's registers hold (held), where each was formed, its stack accesses and the
+        constants it loads; seeds: {register: (stack offset, index of the site forming it)} it holds on entry"""
         held, formed, accesses, known = {}, {}, [], {}
+        for name, (value, site) in (seeds or {}).items():
+            held[name] = value
+            formed.setdefault(value, site)
         for k in path:
             insn = decode(k)
             if jump(k) is not None:
@@ -937,6 +998,90 @@ def rom_fill(rom, address, compiled, fill, found=None):
                 known[loaded[0]] = loaded[1]
         return held, formed, accesses, known
 
+    def live_in(path):
+        """the callee-saved registers the path reads before it writes them"""
+        names, done = [], set()
+        for k in path:
+            insn = decode(k)
+            for name in sorted({insn.reg_name(r) for r in insn.regs_access()[0]} & set(CALLEE_SAVED) - done):
+                if name not in names:
+                    names.append(name)
+            done |= written(insn)
+        return names
+
+    def sources(j):
+        """the indices control passes to index j from: each executes just before it"""
+        if where(j) == address:
+            raise ProofError("a route reaches the function's entry, where the register holds the caller's value")
+        if instructions[j] in labels:
+            return predecessors(j)
+        if not inside(j - 1):
+            raise ProofError(f"{where(j):08X} follows no instruction of the function")
+        before = decode(j - 1)
+        ends = instructions[j - 1] in far or before.mnemonic in ("b", "bx") or "pc" in written(before) and \
+            before.mnemonic not in ("bl", "blx") and branch_target(half(j - 1), where(j - 1)) is None
+        if not ends and instructions[j - 1] + before.size != instructions[j]:
+            raise ProofError(f"{where(j - 1):08X} does not fall through to {where(j):08X}")
+        return [] if ends else [j - 1]
+
+    def carried_value(first, name):
+        """(K, forming sites, calls crossed) when on every route into index first the callee-saved register name
+        holds sp+K: each route, walked backwards, reaches a write of it whose own straight line (read()) makes it
+        sp+K, with one K for all, before any other write of it, any change of sp, a SWI or the function's entry.
+        The calls the routes cross are Carrier's to check."""
+        seen, pending, sites, calls = set(), [first], {}, set()
+        while pending:
+            for k in sources(pending.pop()):
+                if k in seen:
+                    continue
+                seen.add(k)
+                if len(seen) > MAX_CARRY:
+                    raise ProofError(f"the routes into {where(first):08X} are longer than {MAX_CARRY} instructions")
+                insn = decode(k)
+                if name in written(insn):
+                    value = read(list(range(start(k), k + 1)))[0].get(name)
+                    if value is None:
+                        raise ProofError(f"{where(k):08X} writes {name} with no stack address")
+                    sites[k] = value
+                    continue
+                call = insn.mnemonic == "bl" and jump(k) is None
+                if "sp" in written(insn) and not call:
+                    raise ProofError(f"{where(k):08X} changes sp on a route into {where(first):08X}")
+                if insn.mnemonic in ("svc", "swi"):
+                    raise ProofError(f"{where(k):08X} is a SWI on a route into {where(first):08X}")
+                if call:
+                    calls.add(k)
+                    if len(calls) > MAX_CARRY_CALLS:
+                        raise ProofError(f"the routes into {where(first):08X} cross more than {MAX_CARRY_CALLS} "
+                                         "calls")
+                pending.append(k)
+        if len(set(sites.values())) != 1:
+            raise ProofError(f"{name} reaches {where(first):08X} " + ("formed nowhere" if not sites else
+                             "as different stack addresses: " + ", ".join(
+                                 f"sp+{value:#x} at {where(k):08X}" for k, value in sorted(sites.items()))))
+        return sites[min(sites)], sorted(sites), sorted(calls)
+
+    def carried(first, path):
+        """({register: (K, forming site)}, facts) for the path's live-in callee-saved registers that carry a stack
+        address across the calls before it (carried_value, Carrier), and the reasons the others do not"""
+        seeds, facts, reasons = {}, [], []
+        for name in live_in(path):
+            try:
+                value, sites, calls = carried_value(first, name)
+                premises = carrier.check(CALLEE_SAVED[name], [where(k) for k in calls])
+            except ProofError as refusal:
+                reasons.append(f"{name}: {refusal}")
+                continue
+            seeds[name] = (value, sites[0])
+            fact = f"sp+{value:#x} held in {name} from {', '.join(f'{where(k):08X}' for k in sites)}"
+            if calls:
+                fact += (f" across the calls at {', '.join(f'{where(k):08X}' for k in calls)}, each walked by the "
+                         f"callee-saved check (it returns {name} unchanged and uses no bit of it)")
+            else:
+                fact += " across no call"
+            facts.append(fact + "".join(f"; callee-saved {text}" for text in premises))
+        return seeds, facts, reasons
+
     index = call_of(fill)
     bl, callee = where(index), fill.get("callee", CPUSET_NAME)
     if proof.decode_bl(rom, bl) != CALLEES[callee][0]:
@@ -964,6 +1109,14 @@ def rom_fill(rom, address, compiled, fill, found=None):
         held, formed, accesses, known = read(path)
         slot = held.get("r0")
         mine = [a for a in accesses if slot is not None and overlaps(a[0], a[1], slot, width)]
+        facts, reasons = [], []
+        if not mine and carrier is not None:
+            # the slot's address may come into the path in a callee-saved register, formed before calls
+            seeds, facts, reasons = carried(first, path)
+            if seeds:
+                held, formed, accesses, known = read(path, seeds)
+                slot = held.get("r0")
+                mine = [a for a in accesses if slot is not None and overlaps(a[0], a[1], slot, width)]
         if not mine and first > 0 and inside(first - 1) and instructions[first] in labels:
             for previous in predecessors(first):
                 if previous == first - 1 and stops(decode(previous)) and \
@@ -979,7 +1132,8 @@ def rom_fill(rom, address, compiled, fill, found=None):
                 raise ProofError(f"more than {MAX_PATHS} paths reach the BL at {bl:08X}")
             continue
         if slot is None:
-            raise ProofError(f"r0 holds no stack address at the BL at {bl:08X}")
+            raise ProofError(f"r0 holds no stack address at the BL at {bl:08X}" +
+                             (f" ({'; '.join(reasons)})" if reasons else ""))
         if len(mine) != 1 or mine[0][:3] != (slot, width, True):
             raise ProofError(f"the slot sp+{slot:#x} of the fill at {bl:08X} is not stored exactly once with "
                              f"{width} bytes before it")
@@ -1007,13 +1161,14 @@ def rom_fill(rom, address, compiled, fill, found=None):
         if value is not None and mine[0][4] is not None and mine[0][4] & (1 << 8 * width) - 1 != value:
             raise ProofError(f"the store at {where(mine[0][3]):08X} writes {mine[0][4] & (1 << 8 * width) - 1:#x} "
                              f"to the slot sp+{slot:#x}, not the fill's value {value:#x}")
-        paths.append((owner, slot, where(formed[slot]), joins))
+        paths.append((owner, slot, where(formed[slot]), joins, facts))
     for one in sharing:
-        slots = {slot for owner, slot, _, _ in paths if owner is one}
+        slots = {slot for owner, slot, _, _, _ in paths if owner is one}
         if len(slots) != 1:
             raise ProofError(f"the fill at insn UID {one['call'].uid} reaches the BL at {bl:08X} by "
                              f"{'no path of its own' if not slots else 'paths with different slots'}")
-    _, slot, formed, joins = next(path for path in paths if path[0] is fill)
+    _, slot, formed, joins, _ = next(path for path in paths if path[0] is fill)
+    fill["carried"] = sorted({fact for owner, _, _, _, facts in paths if owner is fill for fact in facts})
     return bl, slot, formed, joins
 
 
@@ -1069,7 +1224,8 @@ def prove(tree, project, relpath, raw, admitted, rom=None, dependencies=None):
                 raise ProofError(f"another function of the unit, {other}, holds a volatile reference")
         found = sorted(fills(rtl[name], taken), key=lambda fill: fill["store"])
         wrappers(rom, {fill["callee"] for fill in found})
-        sites = [rom_fill(rom, address, real, fill, found) for fill in found]
+        carry = carrier(project, rom, address, dependencies)
+        sites = [rom_fill(rom, address, real, fill, found, carry) for fill in found]
         keys = [store_key(touch) for touch in volatile_frame_stores(rtl[name], proof.Resolver(rtl[name]))]
         if len(keys) != len(found):
             raise ProofError("the fills do not account for every volatile frame store")
@@ -1096,6 +1252,7 @@ def prove(tree, project, relpath, raw, admitted, rom=None, dependencies=None):
     for g, removed, variant in zip(groups, owned, variants):
         where = f"macro {g['name']}, used {len(removed)} times" if g["kind"] == "macro" else "a block"
         listed = "; ".join(f"{bl:08X} fills from sp+{slot:#x} (address formed at {formed:08X}, "
+                           + "".join(f"{fact}, " for fact in found[k].get("carried", ()))
                            + "".join(f"joining at {label:08X} from {at:08X}, " for label, at in joins)
                            + f"control {found[k]['control']:#010x}, {found[k]['width']}-byte units)"
                            for k, (bl, slot, formed, joins) in enumerate(sites) if k in removed)
@@ -1109,6 +1266,21 @@ def prove(tree, project, relpath, raw, admitted, rom=None, dependencies=None):
                  f"insn UIDs {apart_uids}" if apart_uids else ""))
         verdicts += [(o, ("admitted", text)) for o in g["offsets"]]
     return verdicts
+
+
+def carrier(project, rom, address, dependencies=None):
+    """the Carrier of the project's function index, or None when it has none (then no address is carried)"""
+    mapping = Path(project) / "config" / "functions.json"
+    try:
+        raw = mapping.read_bytes()
+        entries = json.loads(raw)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(entries, list):
+        return None
+    if dependencies is not None:
+        dependencies.append((str(mapping), sha256(raw).hexdigest()))
+    return Carrier(rom, entries, address)
 
 
 def account(keys, left, reach, line):

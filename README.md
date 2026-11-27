@@ -6233,6 +6233,25 @@ formed. What shows the qualifier is the code it changes. The report record
 lists each fill's site, slot, control word and any branch target its path
 joins at, and the BIOS call's bytes.
 
+A path that shows no access to the slot may take the slot's address from a
+callee-saved register (`r4`-`r11`) it reads before writing: agbcc may form the
+address once, keep it there across branches, loops and calls, and copy it to
+`r0` at the BL (0x08023FD0 keeps sp+2 in `r6` across a branch and nine calls;
+0x0810EC04 moves sp+0x34 to `sl` before a loop of calls). The register holds
+`sp+K` when every route into the path, walked backwards on the ROM's
+control-flow graph, reaches a write of it whose own straight line makes it
+`sp+K`, with one `K` for every route, before any other write of it, any change
+of `sp`, a SWI or the function's entry, and when every call those routes cross
+passes the callee-saved check (kit #350), which walks the callee and requires
+the register and `sp` returned unchanged and no bit of the register used. The
+project's function index (`config/functions.json`) is an input of the proof;
+without it nothing is carried. The fill's record then states the register, its
+forming sites and the calls crossed (`sp+K held in rN from <site> across the
+calls at <sites>, each walked by the callee-saved check (it returns rN unchanged
+and uses no bit of it)`), followed by every premise that check states
+(`callee-saved premise: ...`). Replay recomputes the record, so a changed
+register, site, call or premise does not replay.
+
 **Volatile the ROM shows (`volatile-rom-proof-v1`, `tools/volatile_rom_proof.py`):**
 a `volatile` token of the addressed `src/<ADDR>.c` that no exception above
 or below admits is admitted when the ROM shows the qualifier's effect on a
