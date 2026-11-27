@@ -51,7 +51,8 @@ holds:
 6. Each fill in R's code, which is the ROM's (rom_fill).  The fill's BL is its call's one site; a call that left no
    site (cross-jumping replaced the end of its block by a branch into another fill's identical tail) has the BL that
    the last insn of its block the code still holds reaches in a straight line, through unconditional branches only.
-   On every path into the BL: one store of the temporary's width is the only access to the slot, r0 holds the slot's
+   On every path into the BL: no access has a register offset whose base or index holds a stack address (its
+   address is unknown), one store of the temporary's width is the only access to the slot, r0 holds the slot's
    address at the BL, r1 holds no stack address whose filled bytes reach the slot and r3 none in it, r2 and the
    stored register, where the path sets them to a literal the ROM holds or to an immediate, are the fill's control
    word and the value its RTL store writes, and the BL reaches the fill's BIOS call.  (agbcc may keep a constant in
@@ -914,14 +915,16 @@ def rom_fill(rom, address, compiled, fill, found=None):
                 raise ProofError(f"{insn.address:08X} transfers a block through a stack address inside the fill")
             width = ACCESS_WIDTHS.get(insn.mnemonic)
             if width and len(ops) >= 2 and ops[1] != "pc":
+                # a register offset ([rB, rI]) reaches an address the path does not know: refused before the base
+                # is read as a held address at displacement 0
+                if len(ops) == 3 and not immediate and (ops[1] in held or ops[2] in held):
+                    raise ProofError(f"{insn.address:08X} indexes the stack by a register inside the fill")
                 displacement = immediate[0] if immediate else 0
                 if ops[1] == "sp":
                     access = (displacement, width, insn.mnemonic.startswith("str"), k, known.get(ops[0]))
                 elif ops[1] in held:
                     access = (held[ops[1]] + displacement, width, insn.mnemonic.startswith("str"), k,
                               known.get(ops[0]))
-                elif len(ops) == 3 and not immediate and (ops[1] in held or ops[2] in held):
-                    raise ProofError(f"{insn.address:08X} indexes the stack by a register inside the fill")
             if access:
                 accesses.append(access)
             for register in writes:

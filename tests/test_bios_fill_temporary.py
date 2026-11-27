@@ -461,6 +461,22 @@ class RomTests(unittest.TestCase):
                 with self.assertRaisesRegex(proof.ProofError, reason):
                     fill.rom_fill(rom, ADDRESS, compiled, one)
 
+    def test_a_register_offset_from_a_stack_address_refuses(self):
+        # `strh r0, [r1, r2]` with r1 = sp+0x38 writes sp+0x38+r2, an address the path does not know; it was read
+        # as a store to sp+0x38 (the base at displacement 0)
+        strh_r0_r1_r2, ldrh_r3_r1_r2, add_r2_sp_38, strh_r0_r4_r2 = 0x5288, 0x5A8B, 0xAA0E, 0x52A0
+        tail = [ADDS_R1_R7, LDR_R2, ADD_R0_SP_38, ("bl", 0x0814186C)]
+        for label, items in (("the fill's store", [ADD_R1_SP_38, MOVS_R0_0, strh_r0_r1_r2] + tail),
+                             ("a load", [ADD_R1_SP_38, MOVS_R0_0, STRH_R0_R1, ldrh_r3_r1_r2] + tail),
+                             ("the index", [ADD_R1_SP_38, MOVS_R0_0, STRH_R0_R1, add_r2_sp_38, strh_r0_r4_r2] + tail)):
+            with self.subTest(label=label):
+                rom, compiled, one = window(items)
+                with self.assertRaisesRegex(proof.ProofError, "indexes the stack by a register inside the fill"):
+                    fill.rom_fill(rom, ADDRESS, compiled, one)
+        # an immediate offset from a stack address is placed: `strh r0, [r1, #2]` writes sp+0x3a, beside the slot
+        rom, compiled, one = window([ADD_R1_SP_38, MOVS_R0_0, STRH_R0_R1, 0x8048] + tail)
+        self.assertEqual(fill.rom_fill(rom, ADDRESS, compiled, one)[1], 0x38)
+
     def test_a_cpufastset_fill_in_the_rom(self):
         # 0801A176: movs r0, #0; str r0, [sp]; ldr r1, [sp, #0xc]; ldr r2, =0x010013F8; mov r0, sp; bl CpuFastSet
         fast = dict(width=4, callee="func_08141868")
