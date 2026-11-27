@@ -10,6 +10,16 @@ Schemas for matcher paths that reach a buffer call with named data:
   the same proof with the function-buffer restrictions
   (``FunctionBufferCallProof``), beside typed object and function literals.
 * The menu list callback adds a restoring-frame proof for its two far epilogue jumps.
+* ``elf-symbol-thumb-data-owner-switch-frame-v1`` (plain path, owner switch only):
+  the plain path's walk of an owner whose own guarded jump table
+  ``owner_switch_buffer_profile`` authenticated, when no call receives a local
+  buffer.  The walk is the one the plain schema runs (fixed frame, every
+  SP-derived value tracked, calls under their ABI summaries, returns re-proved);
+  only that schema's demand for an inspected buffer call is not made, and the
+  report says so in its buffer-calls line.  An owner with a ``_call_via_rN``
+  thunk call or a function literal refuses, and one with a summarised division
+  runtime call keeps the plain refusal (``OWNER_SWITCH_FRAME.enabled = False``
+  restores it for every owner).
 
 Both require typed provenance for every reached RAM or ROM address-domain
 literal word, as the complete-owner selectors do; untyped words in the fixed
@@ -34,7 +44,8 @@ from menu_list_frame import MenuListFrame, ADDRESS as MENU_LIST_ADDRESS
 SCHEMA = "elf-symbol-thumb-data-buffer-calls-v1"
 FUNCTION_SCHEMA = "elf-symbol-thumb-function-data-buffer-calls-v1"
 MENU_LIST_SCHEMA = "elf-symbol-thumb-menu-list-long-branches-v1"
-SCHEMAS = (SCHEMA, FUNCTION_SCHEMA, MENU_LIST_SCHEMA)
+OWNER_SWITCH_FRAME_SCHEMA = "elf-symbol-thumb-data-owner-switch-frame-v1"
+SCHEMAS = (SCHEMA, FUNCTION_SCHEMA, MENU_LIST_SCHEMA, OWNER_SWITCH_FRAME_SCHEMA)
 PREMISE = "premise, not checked: named objects do not overlap any live stack"
 SUMMARIES = {
     SCHEMA: "typed ABS32 object literals beside the ROM-checked version-2 buffer proof; "
@@ -43,9 +54,17 @@ SUMMARIES = {
                       "frame and ROM-checked byte outputs; " + PREMISE,
     FUNCTION_SCHEMA: "typed ABS32 object and canonical function literals beside the ROM-checked "
                      "version-2 function-buffer proof; every reached RAM/ROM address word typed; " + PREMISE,
+    OWNER_SWITCH_FRAME_SCHEMA: "typed ABS32 object literals beside the version-2 walk of the owner's "
+                               "authenticated guarded switch, with no buffer call, call-via thunk or function "
+                               "literal; every reached RAM/ROM address word typed; " + PREMISE,
 }
 MARKER = "* data buffer"
 CALLS_FIELD = "* data buffer calls: "
+# The owner switch frame schema's own field in place of CALLS_FIELD: it has no buffer call.
+FRAME_FIELD = "* data owner switch frame: "
+# Its `* buffer calls:` line (match.render_report), the explicit statement that no call took a local buffer.
+NO_BUFFER_CALLS = ("none: the version-2 walk of the owner switch passed no local buffer to any call; "
+                   "frame, aliases, calls and returns proved as for a buffer call")
 MANIFEST_FIELD = "* data buffer manifest: "
 PROOF_FIELD = "* data buffer proof SHA-256: "
 # Reached PC-loaded words in this window need typed provenance (the owner rule's
@@ -56,6 +75,43 @@ ADDRESS_DOMAIN = rom_mirror.TYPED_DOMAIN
 HARDWARE_WINDOW = (0x04000000, 0x08000000)
 REPLAY_TIMEOUT = 120
 _replay_active = ContextVar("data_buffer_replay_active", default=False)
+
+
+class OwnerSwitchFrame:
+    """False restores `data-buffer evidence requires an inspected buffer call` for every owner switch."""
+    enabled = True
+
+
+OWNER_SWITCH_FRAME = OwnerSwitchFrame()
+
+
+def calls_field(schema):
+    return FRAME_FIELD if schema == OWNER_SWITCH_FRAME_SCHEMA else CALLS_FIELD
+
+
+def owner_switch_frame(proof, calls, function_relocations):
+    """Whether a walk that inspected no buffer call is the owner switch frame schema's; refuses otherwise.
+
+    The plain path's proof, bound to an owner switch whose walk completed (owner_switch_buffer_profile
+    authenticated the table from the ROM bytes and the walk covered the complete owner graph), with no
+    `_call_via_rN` thunk call, no function literal and no summarised division runtime call.
+    """
+    import match
+    import function_thunk_profile as thunk
+    from owner_switch_buffer_profile import OwnerSwitch
+    owner = getattr(proof, "owner_switch", None)
+    # prove() builds the proof from this module's `match`, as OwnerSwitch requires.
+    if not OWNER_SWITCH_FRAME.enabled or proof.buffer_evidence() or type(owner) is not OwnerSwitch or \
+            owner.complete is not True or type(proof) is not match.BufferCallProof or proof.stack_arguments is not True:
+        raise ValueError("data-buffer evidence requires an inspected buffer call")
+    if match.remainder_leaf.active() and any(target in match.remainder_leaf.entries() for target in calls.values()):
+        # A summarised division runtime site counts as the inspected call only under that leaf's own
+        # evidence rule (signed_remainder_leaf_profile); this schema never stands in for it.
+        raise ValueError("data-buffer evidence requires an inspected buffer call")
+    # Every `_call_via_rN` entry, in any ROM mirror, lies in the reserved thunk range.
+    if function_relocations or any(thunk.reserved(target) for target in calls.values()):
+        raise ValueError("owner switch frame proof excludes call-via thunks and function literals")
+    return True
 
 
 def manifest_text(manifest):
@@ -76,7 +132,7 @@ def fingerprint(schema, address, data, manifest, source_digest, mapping, objects
 
 
 def report_lines(schema, address, data, manifest, source_digest, mapping, objects, buffer_digest):
-    return [CALLS_FIELD + SUMMARIES[schema],
+    return [calls_field(schema) + SUMMARIES[schema],
             f"{MANIFEST_FIELD}`{manifest_text(manifest)}`",
             f"{PROOF_FIELD}`{fingerprint(schema, address, data, manifest, source_digest, mapping, objects, buffer_digest)}`"]
 
@@ -249,7 +305,9 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
                 reset = (lambda: dma_fills.__init__(dma_fills.rom, dma_fills.premises)) if dma_fills is not None else None
                 instructions, proof = closure.retry(error, run, rebuild, data, address, premises, reset=reset)
     if not proof.buffer_evidence():
-        raise ValueError("data-buffer evidence requires an inspected buffer call")
+        # Only the plain proof's owner switch walk, with no thunk or function literal, goes on without one.
+        owner_switch_frame(proof, calls, function_relocations)
+        schema = OWNER_SWITCH_FRAME_SCHEMA
     match.verify_data_literals(instructions, address, literals)
     thunk.verify_literal_bindings(data, address, instructions, calls, mapping, function_relocations)
     if any(thunk.reserved(target) for target in calls.values()):
@@ -379,7 +437,7 @@ FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* 
           # motion_wrapper_summary_profile.MotionSummaries.lines
           "* buffer motion wrapper", "* buffer motion wrapper facts", "* buffer motion wrapper site",
           "* buffer motion wrapper premise",
-          "* data symbols SHA-256", "* data buffer calls", "* data buffer manifest",
+          "* data symbols SHA-256", "* data buffer calls", "* data owner switch frame", "* data buffer manifest",
           "* data buffer proof SHA-256", "* compiler", "* verified extent", "* relocations",
           "* ROM bytes", "* compiled ", "* source plausibility", "* hand-asm allow list",
           "* DMA fills", "* DMA fill premise", "* DMA fill destination premise", "* DMA fill manifest",
@@ -446,8 +504,9 @@ def report_matches(report, root, address):
                 quoted("* mapping SHA-256: ") != mapping_fingerprint(functions) or \
                 quoted("* data symbols SHA-256: ") != mapping_fingerprint(objects) or \
                 single("* control flow: ") not in (CALL_SUMMARY, "closed leaf CFG") or \
-                single("* buffer calls: ") != STACK_BUFFER_SUMMARY or \
-                single(CALLS_FIELD) != SUMMARIES[schema] or \
+                single("* buffer calls: ") != (NO_BUFFER_CALLS if schema == OWNER_SWITCH_FRAME_SCHEMA
+                                               else STACK_BUFFER_SUMMARY) or \
+                single(calls_field(schema)) != SUMMARIES[schema] or \
                 quoted("* compiler: ") != f"{DEFAULT_CC} {DEFAULT_FLAGS}" or \
                 single("* verified extent: ") != "complete ELF function symbol, including literal pools" or \
                 single("* relocations: ") != "none" or single("* source plausibility: ") != "plausible" or \

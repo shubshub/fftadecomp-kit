@@ -6704,8 +6704,11 @@ def render_report(*, addr, src_rel, schema, fingerprint, compiler, want, span, g
     if far_jumps:
         # X1: the root walk's far jumps (far_jump_profile), from its verified instructions.
         out.append(far_jump.report_line(far_jumps) + "\n")
-    if buffer_proof is not None and buffer_proof.buffer_evidence():
-        summary = STACK_BUFFER_SUMMARY if buffer_proof.stack_arguments else BUFFER_SUMMARY
+    owner_switch_frame = schema == data_buffer.OWNER_SWITCH_FRAME_SCHEMA
+    if buffer_proof is not None and (buffer_proof.buffer_evidence() or owner_switch_frame):
+        # The owner switch frame schema states that no call took a local buffer (data_buffer_profile).
+        summary = (data_buffer.NO_BUFFER_CALLS if owner_switch_frame else
+                   STACK_BUFFER_SUMMARY if buffer_proof.stack_arguments else BUFFER_SUMMARY)
         out.append(f"* buffer calls: {summary}\n")
         out.append(f"* buffer proof SHA-256: `{buffer_proof.fingerprint()}`\n")
         for line in buffer_proof.loop_replay_lines() + buffer_proof.bios_summary_lines():
@@ -7680,7 +7683,9 @@ def main():
                 function_thunk.verify_own_span_literals(
                     got, addr, verified_instructions,
                     switch_evidence["switch"]["literal"] if thunk_switch_selector else None)
-            if buffer_proof.stack_arguments and not buffer_proof.buffer_evidence():
+            # data_buffer.prove returns the owner switch frame schema only for the walk it admits without one.
+            if buffer_proof.stack_arguments and not buffer_proof.buffer_evidence() and \
+                    data_buffer_schema != data_buffer.OWNER_SWITCH_FRAME_SCHEMA:
                 raise ValueError("stack-buffer evidence requires an inspected buffer call")
             if buffer_proof.buffer_evidence() and data_relocations and data_buffer_evidence is None:
                 raise ValueError("buffer-call evidence does not support data relocations")
