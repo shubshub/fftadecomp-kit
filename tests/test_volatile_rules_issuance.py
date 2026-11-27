@@ -9,7 +9,8 @@ and the report must say MATCH and carry the rule's record:
 - R1: a spill reload inside a read-modify-write window;
 - N and R4: `bldy_lo--; if (bldy_lo == 0)`;
 - P: one typed pointer to the block;
-- T: a typed copy saved by the compiler's memcpy under the copy80 route;
+- T: a typed copy saved by the compiler's memcpy under the copy80 route, issued and then replayed
+  through match_evidence.report_matches (status.py --verify's owner pre-check);
 - R2: `bldcnt_lo |= 0xff`;
 - Z: a reviewed ordinary-RAM object (a tools copy with a test entry).
 """
@@ -244,6 +245,28 @@ def issued(test, root, *options, tools=None):
     return report.read_text()
 
 
+REPLAY = """import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import match_evidence
+root = Path(sys.argv[2])
+print("replay", match_evidence.report_matches((root / "docs/match/08000200.md").read_text(), root, 0x08000200))
+"""
+
+
+def replayed(test, root, tools=None):
+    """match_evidence.report_matches on the saved report, in a fresh interpreter, as status.py --verify's
+    owner pre-check runs it: True or False"""
+    environment = dict(os.environ, FFTA_ROM=str(Path(root) / "baserom.bin"), PYTHONDONTWRITEBYTECODE="1")
+    result = subprocess.run([sys.executable, "-c", REPLAY, str(Path(tools or ROOT / "tools")), str(root)],
+                            capture_output=True, text=True, env=environment, timeout=900)
+    output = result.stdout + result.stderr
+    test.assertEqual(result.returncode, 0, output[-3000:])
+    verdicts = [line for line in result.stdout.splitlines() if line.startswith("replay ")]
+    test.assertEqual(len(verdicts), 1, output[-3000:])
+    return verdicts[0] == "replay True"
+
+
 @unittest.skipUnless(calls.tools_present(), "fixed compiler and ARM tools required")
 class IssuanceTests(unittest.TestCase):
     @classmethod
@@ -300,6 +323,8 @@ class IssuanceTests(unittest.TestCase):
         report = issued(self, root, "--owner-runtime-profile", COPY80)
         self.assertIn("typed copies (kit#375): `" + SYMBOL + "` saved to ", report)
         self.assertIn("bound to func_08000400 by " + COPY80 + "; premise: the copy at", report)
+        # the saved report replays: the replay takes the copy80 route too, so memcpy is typed as at issuance
+        self.assertTrue(replayed(self, root))
 
     def test_z_reviewed_ram(self):
         # a tools copy whose volatile_objects.json holds a reviewed entry for this fixture's function
