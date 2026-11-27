@@ -92,6 +92,34 @@ class CopyClassTests(unittest.TestCase):
         for name, first, second in (('copy first', copy_only, twin), ('copy second', twin, copy_only)):
             with self.subTest(name):
                 self.assert_refused(split(first, second))
+        # A branch straight to the join: movs r3,#3; cmp r1,#0; beq J; adds r3,r4,#0; J: GUARD.  The
+        # fall-through copy reaches J before the taken edge's own state is walked on, so a join that
+        # kept the incoming classes would refine r3 = 3 by r4's compare (rv-R's T10).
+        self.assert_refused((0x2303, 0x2900, 0xD000, COPY) + GUARD)
+        self.assert_proved(admitted((COPY, 0x2900, 0xD000, COPY) + GUARD))
+
+    def test_a_join_meets_the_two_partitions_whichever_path_arrives_first(self):
+        # join_states keeps only what both sides share, whichever side is the state already there.
+        analysis = sip.Analysis(bytes(4), 0x08010000, {}, {}, {})
+
+        def state(*groups):
+            labels = list(range(16))
+            for group in groups:
+                for register in group:
+                    labels[register] = group[0]
+            return sip.State((), frozenset(), tuple([sip.TOP] * 16), tuple([None] * 16), None,
+                             sip.classes(labels))
+
+        def together(joined, *registers):
+            return len({joined.same[register] for register in registers}) == 1
+        for old, new in ((state((3, 4)), state()), (state(), state((3, 4)))):
+            joined = analysis.join_states(old, new, 0x08010000, 1)
+            self.assertFalse(together(joined, 3, 4))
+        for old, new in ((state((2, 3, 4)), state((3, 4), (2, 5))), (state((3, 4), (2, 5)), state((2, 3, 4)))):
+            joined = analysis.join_states(old, new, 0x08010000, 1)
+            self.assertTrue(together(joined, 3, 4))
+            self.assertFalse(together(joined, 2, 3) or together(joined, 2, 5))
+        self.assertTrue(together(analysis.join_states(state((3, 4)), state((3, 4)), 0x08010000, 1), 3, 4))
 
 
 # 0x080EF970's shape in C: the mode stays live after the index is taken from it.
