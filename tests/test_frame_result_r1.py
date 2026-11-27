@@ -130,13 +130,13 @@ class EvidenceTests(unittest.TestCase):
             # an open function, an unmapped gap of 0x0000 (lsls r0, r0, #0) and then the entry
             "0x0800FFFA, may fall into its entry": ({F - 6: [0x2000, 0x2000], F: [BX_LR],
                                                      CALLER: caller([MOVS_R1_0])}, {F - 2: b"\x00\x00"}),
-            "BL at 0x08012002 branches into the unmapped gap": (
+            "BL at 0x08012002 branches into the unreached bytes": (
                 {F - 4: [BX_LR], F: [BX_LR], CALLER: caller([MOVS_R1_0]), OTHER: [PUSH_LR, F - 2, POP_R0, BX_R0]},
                 None),
-            "word at 0x08013000 names the unmapped gap before it": (
+            "word at 0x08013000 names the unreached bytes before it": (
                 {F - 4: [BX_LR], F: [BX_LR], CALLER: caller([MOVS_R1_0])},
                 {0x08013000: struct.pack("<I", (F - 2) | 1)}),
-            "branch at 0x0800FF00 reaches the unmapped gap before it": (
+            "branch at 0x0800FF00 reaches the unreached bytes before it": (
                 {F - 0x100: [0xE000 | (((F - 2 - (F - 0x100) - 4) >> 1) & 0x7FF), BX_LR], F - 4: [BX_LR], F: [BX_LR],
                  CALLER: caller([MOVS_R1_0])}, None),
             "ADR at 0x0800FFC2 forms the address of the function": (
@@ -146,8 +146,17 @@ class EvidenceTests(unittest.TestCase):
             "ADR at 0x0800FFB8 forms the address of the function": (
                 {F - 4: [0x2000, BX_LR], F: [BX_LR], CALLER: caller([MOVS_R1_0])},
                 {F - 0x48: struct.pack("<I", 0xE28F0040)}),
-            "78-byte unmapped gap before it is longer than 64 bytes": (
+            "the 78 unreached bytes before its entry exceed 64": (
                 {F - 0x50: [BX_LR], F: [BX_LR], CALLER: caller([MOVS_R1_0])}, None),
+            # the predecessor ends at the entry, but its bytes after bx lr (movs r0, #0 three times) run on into it
+            "BL at 0x08010102 branches into the unreached bytes before it": (
+                {F - 8: [BX_LR, 0x2000, 0x2000, 0x2000], F: [BX_LR], CALLER: caller([MOVS_R1_0]),
+                 0x08010100: [PUSH_LR, F - 4, READ_R1, POP_R0, BX_R0]}, None),
+            "word at 0x08015000 names the unreached bytes before it": (
+                {F - 8: [BX_LR, 0x2000, 0x2000, 0x2000], F: [BX_LR], CALLER: caller([MOVS_R1_0])},
+                {0x08015000: struct.pack("<I", (F - 4) | 1)}),
+            "the 70 unreached bytes before its entry exceed 64": (
+                {F - 0x48: [BX_LR] + [0x2000] * 35, F: [BX_LR], CALLER: caller([MOVS_R1_0])}, None),
         }
         for message, (bodies, extra) in cases.items():
             with self.subTest(message), self.assertRaisesRegex(ValueError, message):
@@ -170,11 +179,17 @@ class EvidenceTests(unittest.TestCase):
 
     def test_a_closed_function_and_an_unnamed_gap_before_the_entry_are_the_evidence(self):
         found = proved({F - 4: [BX_LR], F: [BX_LR], CALLER: caller([MOVS_R1_0])})
-        self.assertEqual((found["previous"], found["previous_end"], found["gap"]), (F - 4, F - 2, 2))
+        self.assertEqual((found["previous"], found["previous_end"], found["gap_start"], found["gap"]),
+                         (F - 4, F - 2, F - 2, 2))
+        # the predecessor's own unreached tail after bx lr is scanned the same way
+        found = proved({F - 8: [BX_LR, 0x2000, 0x2000, 0x2000], F: [BX_LR], CALLER: caller([MOVS_R1_0])})
+        self.assertEqual((found["previous"], found["previous_end"], found["gap_start"], found["gap"]),
+                         (F - 8, F, F - 6, 6))
 
     def test_a_closed_neighbour_does_not_fall_through(self):
         found = proved({F - 4: [0x2000, BX_LR], F: [BX_LR], CALLER: caller([MOVS_R1_0])})
-        self.assertEqual((found["previous"], found["previous_end"], found["gap"]), (F - 4, F, 0))
+        self.assertEqual((found["previous"], found["previous_end"], found["gap_start"], found["gap"]),
+                         (F - 4, F, F, 0))
 
     def test_the_result_is_cached_per_rom_mapping_and_function(self):
         rom, mapping = image({F: [BX_LR], CALLER: caller([MOVS_R1_0])})
@@ -200,7 +215,7 @@ def frame():
 
 FOUND = dict(schema=frame_r1.SCHEMA, function=A, callers=[dict(site=0x08000502, caller=0x08000500, states=2,
              body_sha256="0" * 64, kills=[0x08000506])], words=0, branches=0, adrs=0, previous=0x080001FE,
-             previous_end=A, gap=0, premise=frame_r1.PREMISE, premise_proved=False)
+             previous_end=A, gap_start=A, gap=0, premise=frame_r1.PREMISE, premise_proved=False)
 
 
 class HookTests(unittest.TestCase):
@@ -365,7 +380,25 @@ class FrameResultR1NativeTests(unittest.TestCase):
         self.assertEqual(code, 0, output)
         (line,) = [line for line in report.splitlines() if line.startswith(frame_r1.LINE)]
         self.assertIn("the mapped function before it, 0x080001F8, has a closed control-flow graph and nothing "
-                      "names the 4-byte unmapped gap from 0x080001FC to the entry", line)
+                      "names the 4 bytes from 0x080001FC to the entry, which its control-flow graph never reaches",
+                      line)
+
+    def test_the_predecessors_tail_after_its_last_transfer_is_scanned(self):
+        # bx lr; movs r0, #0 (x3) ends at the owner's entry: its tail runs on into the owner.  Unnamed, it is
+        # stated; a BL into it (from unmapped bytes at 0x08000100) refuses.
+        before = ((A - 8, [BX_LR, 0x2000, 0x2000, 0x2000]),)
+        root = self.fixture("tail", "movs r1, #0\n", before=before)
+        code, output, report = run(root)
+        self.assertEqual(code, 0, output)
+        (line,) = [line for line in report.splitlines() if line.startswith(frame_r1.LINE)]
+        self.assertIn("the mapped function before it, 0x080001F8, has a closed control-flow graph and nothing "
+                      "names the 6 bytes from 0x080001FA to the entry", line)
+        self.assertTrue(self.replays(report, root))
+        bl = list(struct.unpack("<HH", asm.bl(0x08000100, A - 4)))
+        root = self.fixture("tailcall", "movs r1, #0\n", before=before, extra=((0x08000100, bl),))
+        code, output, report = run(root)
+        self.assertNotEqual(code, 0, output)
+        self.assertIn("(R1: a BL at 0x08000100 branches into the unreached bytes before it)", output)
 
     def test_an_adr_naming_the_owner_refuses(self):
         # add r0, pc, #0xFC at 0x08000100 forms 0x08000200

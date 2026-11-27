@@ -2696,10 +2696,11 @@ evidence from the ROM that no caller reads it:
   immediates with Rn = PC);
 * nothing falls into the entry: the mapped function with the greatest start
   below it is Thumb code, ends at or before the entry and has a closed
-  control-flow graph, and any unmapped gap between them is at most 64 bytes
-  and named by nothing (no word, BL, Thumb branch or ADR targets one of its
-  halfwords), so execution never reaches the gap to run on into the entry.
-  Without such a function it refuses;
+  control-flow graph, and the bytes from the end of its last reached
+  instruction to the entry (a literal pool, dead code, padding, any unmapped
+  gap), which its own paths never run but which would run on into the entry,
+  are at most 64 and named by nothing (no word, BL, Thumb branch or ADR
+  targets one of their halfwords). Without such a function it refuses;
 * every Thumb BL in the ROM that targets it lies in a mapped Thumb function,
   decodes as that BL there, and from the next instruction that caller writes
   R1 before any read, call or return on every path (`dead_register.prove`
@@ -2712,7 +2713,7 @@ from bytes at an odd offset) and code run from VRAM or OAM, the only other
 memory within a direct branch's reach of ROM, so the report states the
 residual premise with the evidence, bound into the fingerprint:
 
-    * buffer frame result r1: `frame-result-r1-dead-at-callers-v1` own-frame addresses dropped at the owner's normal returns: `0x<return site> r1 <entry-SP offset>`; no ROM word at any byte offset equals <function> or <function|1> and no halfword-aligned one equals either in a ROM mirror (0x09000000-0x0DFFFFFF), no Thumb branch outside it reaches its entry and no ADR forms its address; nothing falls into it: the mapped function before it, <previous>, has a closed control-flow graph[ and nothing names the <n>-byte unmapped gap from <end> to the entry]; every direct caller writes R1 before any read, call or return: <BL site> in <caller> (R1 written at <sites>; <n> states), ...; unproved runtime premise: code runs only from the BIOS, ROM, EWRAM and IWRAM, and no code reaches the function, or unmapped bytes before it, through an address formed at run time (by arithmetic, in decompressed data, or as a ROM mirror address assembled from bytes at an odd offset) rather than stored in the ROM, so its direct callers are all its callers
+    * buffer frame result r1: `frame-result-r1-dead-at-callers-v1` own-frame addresses dropped at the owner's normal returns: `0x<return site> r1 <entry-SP offset>`; no ROM word at any byte offset equals <function> or <function|1> and no halfword-aligned one equals either in a ROM mirror (0x09000000-0x0DFFFFFF), no Thumb branch outside it reaches its entry and no ADR forms its address; nothing falls into it: the mapped function before it, <previous>, has a closed control-flow graph[ and nothing names the <n> bytes from <start> to the entry, which its control-flow graph never reaches]; every direct caller writes R1 before any read, call or return: <BL site> in <caller> (R1 written at <sites>; <n> states), ...; unproved runtime premise: code runs only from the BIOS, ROM, EWRAM and IWRAM, and no code reaches the function, or unmapped bytes before it, through an address formed at run time (by arithmetic, in decompressed data, or as a ROM mirror address assembled from bytes at an odd offset) rather than stored in the ROM, so its direct callers are all its callers
 
 `frame_result_r1_profile.POLICY.enabled = False` restores the refusal;
 `tests/test_frame_result_r1.py` covers the scan, the evidence and a native
