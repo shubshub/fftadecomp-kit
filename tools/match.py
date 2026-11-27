@@ -3968,7 +3968,8 @@ class BufferCallProof:
         return call_via.argument_constants(constants) if call_via.active(self) else {}
 
     def extra_constant(self, instruction, data, address, constants):
-        if address in self.fresh_block_entries and fresh_block.applies(self) and call_via.active(self):
+        # getattr: a proof a profile builds without this constructor has no entries (fresh_block_profile).
+        if address in getattr(self, "fresh_block_entries", ()) and fresh_block.applies(self) and call_via.active(self):
             # A reviewed entry's stored call target, forwarded to its reload (fresh_block_profile).
             forwarded = fresh_block.extra_constant(self, instruction, address, constants)
             if forwarded is not None:
