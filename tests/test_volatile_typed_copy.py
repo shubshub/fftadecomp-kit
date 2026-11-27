@@ -196,6 +196,10 @@ class SemanticTests(unittest.TestCase):
         self.refused(body(read="ldrh\tr0, [r4, r1]"), "variable offset", perturbed=body(read="ldrh\tr0, [r4, r1]"))
         self.refused(body(read="ldrh\tr0, [r4, #160]"), "other than as one pinned member",
                      perturbed=body(read="ldrh\tr0, [r4, #160]"))
+        # a signed read of a pinned member at its own offset and width is not a member read either
+        # (Thumb's ldrsb takes a register offset only)
+        self.refused(body("mov\tr1, #160", read="ldrsb\tr0, [r4, r1]"), "other than as one pinned member",
+                     perturbed=body("mov\tr1, #161", read="ldrsb\tr0, [r4, r1]"))
 
     def test_the_copy_s_address_does_not_escape(self):
         escape = ("mov\tr0, r4", "add\tr0, r0, #101", "bl\tfunc_0802A2C0")

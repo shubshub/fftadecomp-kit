@@ -7,6 +7,7 @@ ldr r3, [sp, #8]; strh r3, [r5, #10]`).  The window admits it only when it
 provably reloads what the nearest earlier store to its slot wrote, and feeds
 only the stored value.
 """
+import copy
 from pathlib import Path
 import sys
 import unittest
@@ -126,6 +127,11 @@ class SpillReloadTests(unittest.TestCase):
         store = semantics.spill_reload(records, position)
         self.assertIsNotNone(store)
         self.assertEqual((store.kind, store.width), ("store", 4))
+        # the reload must be an unsigned word load: Thumb has no signed word load, so the same record
+        # marked signed stands for any load the executor might come to mark so, and reloads nothing
+        signed = copy.copy(records[position])
+        signed.signed = True
+        self.assertIsNone(semantics.spill_reload(records[:position] + [signed] + records[position + 1:], position))
 
 
 if __name__ == "__main__":
