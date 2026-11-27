@@ -121,7 +121,7 @@ def numeric_hardware(data, address, mapping, instructions, calls, words, remaini
 
 
 def prove(data, address, rom, mapping, objects, calls, data_relocations, function_relocations=None, *,
-          index=None, switch_relocations=None, dma_fills=None, premises=None):
+          index=None, switch_relocations=None, dma_fills=None, premises=None, store_bound_premises=False):
     """The composed proof for linked bytes; returns (instructions, buffer proof, schema, manifest).
 
     calls maps each BL site to its target, data_relocations each typed object word
@@ -137,6 +137,9 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
     premises, the decomp's reviewed stack-index premise file, serves the default stack-index
     retry (default_stack_index_profile) of the two plain walks below; the owner switch, the
     menu list frame and the map record loader keep their own walks.
+    store_bound_premises, the decomp's reviewed callee store-bound file (or None without one),
+    serves the reviewed store-bound retry (store_bound_premise_profile) of the plain-path walk;
+    False, the default, leaves that rule off for callers that do not pass the file.
     """
     import closure_slot_profile as closure
     import match
@@ -231,9 +234,20 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
         try:
             instructions = run(proof)
         except ValueError as error:
-            # The caller keeps this recorder: either retry's walk starts it afresh.
-            reset = (lambda: dma_fills.__init__(dma_fills.rom)) if dma_fills is not None else None
-            instructions, proof = closure.retry(error, run, rebuild, data, address, premises, reset=reset)
+            import store_bound_premise_profile as store_bound
+            if store_bound_premises is not False and store_bound.triggered(error) is not None:
+                # The reviewed callee store bounds (match.py's plain path and this proof's replay pass
+                # the file; False leaves the rule off). Each pass's walk starts the recorder afresh.
+                def fresh(candidate):
+                    if dma_fills is not None:
+                        dma_fills.__init__(dma_fills.rom, dma_fills.premises)
+                    return run(candidate)
+                instructions, proof = store_bound.retry(error, rebuild, fresh, data, address, premises,
+                                                        store_bound_premises)
+            else:
+                # The caller keeps this recorder: either retry's walk starts it afresh.
+                reset = (lambda: dma_fills.__init__(dma_fills.rom)) if dma_fills is not None else None
+                instructions, proof = closure.retry(error, run, rebuild, data, address, premises, reset=reset)
     if not proof.buffer_evidence():
         raise ValueError("data-buffer evidence requires an inspected buffer call")
     match.verify_data_literals(instructions, address, literals)
@@ -326,9 +340,11 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest, dma
             if got != data:
                 raise ValueError("data-buffer fresh complete bytes differ")
             import default_stack_index_profile as default_index
+            import store_bound_premise_profile as store_bound
             result = prove(got, address, rom, mapping, objects, calls, literals, functions, index=index,
                            switch_relocations=switches, dma_fills=dma_fills,
-                           premises=default_index.snapshot(root))
+                           premises=default_index.snapshot(root),
+                           store_bound_premises=store_bound.snapshot(root))
             checker = Path(__file__).with_name("plausible.py")
             checked = _run_replay_process([sys.executable, str(checker), "--quiet", "--addr",
                                            f"0x{address:08X}", "--json"] +
@@ -358,6 +374,8 @@ FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* 
           "* buffer BIOS summaries", "* buffer BIOS premise", "* buffer BIOS manifest", "* buffer BIOS non-argument register",
           "* buffer BIOS call kill",
           "* buffer forwarded slots", "* buffer forwarded slot premise",
+          # store_bound_premise_profile.lines
+          "* buffer store bound", "* buffer store bound row", "* buffer store bound premise",
           "* data symbols SHA-256", "* data buffer calls", "* data buffer manifest",
           "* data buffer proof SHA-256", "* compiler", "* verified extent", "* relocations",
           "* ROM bytes", "* compiled ", "* source plausibility", "* hand-asm allow list",
