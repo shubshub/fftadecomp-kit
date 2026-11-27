@@ -6547,7 +6547,21 @@ symbolically along every path, and the check requires:
   address, since it could return that address. A slot stops being saved
   once a store other than its push overwrites it, or once `sp` rises above
   it (a pop or an add to `sp`); a function that sets `sp` to anything but a
-  fixed offset from the entry `sp` is refused. The record of a verdict that
+  fixed offset from the entry `sp` is refused. A plain load or store (any
+  width) at a fixed slot below the current `sp` is refused (`a frame access
+  below sp`): memory below `sp` is never private, and agbcc never touches
+  it; push and pop move `sp` over the words they transfer. A frame byte
+  that `sp` has risen above holds no defined value, even after `sp` comes
+  down over it again: a call made meanwhile puts its frame there, a BIOS
+  call its stack work, and an interrupt handler may write it at any time. So a read the
+  backward scan finds behind such a release of its bytes, a fixed-slot frame
+  read of a byte released since its store, and a frame read at a variable
+  offset once any stored byte is released are refused (`reads a frame word
+  released by an sp increase`). A store at a variable offset before a
+  release may have written any byte below it, so it counts as a store to
+  each of them that a fixed-slot store has not written again. A pop reads
+  its words before it releases them, and a push or store into a released
+  slot writes it again. The record of a verdict that
   relies on such a read or escape, or that reads a saved slot past a store
   at a variable offset, names its premises: no callee holds a frame address
   before the frame escapes, and a variable offset from `sp` reaches no
