@@ -391,6 +391,30 @@ class StandInTests(unittest.TestCase):
         self.assertIn(':r3=entry-SP-44', facts)
         self.assertIn('keep none of their argument values', proof.motion_summaries.lines()[-1])
 
+    # The review's residual fixtures: LR is caller-clobbered and is checked at the return as well.
+    LR_REFUSAL = 'LR returns a walked-frame address or an entry value other than the entry LR'
+
+    def test_review_f8_frame_address_left_in_lr(self):
+        with self.assertRaisesRegex(ValueError, self.LR_REFUSAL):
+            self.derive(wrapper_after='    mov r1, sp\n    mov lr, r1')
+        self.refused(self.LR_REFUSAL, wrapper_after='    mov r1, sp\n    mov lr, r1',
+                     owner_after='    mov r2, lr\n    ldr r0, [r2, #4]\n' + self.GLOBAL_STORE)
+
+    def test_review_f9_frame_address_left_in_r0(self):
+        self.refused('R0 returns a walked-frame address', wrapper_after='    mov r0, sp',
+                     owner_after='    ldr r0, [r0, #4]\n' + self.GLOBAL_STORE)
+
+    def test_review_f10_owner_address_left_in_lr(self):
+        with self.assertRaisesRegex(ValueError, self.LR_REFUSAL):
+            self.derive(wrapper_after='    ldr r1, [sp, #4]\n    mov lr, r1')
+        self.refused(self.LR_REFUSAL, wrapper_after='    ldr r1, [sp, #4]\n    mov lr, r1',
+                     owner_after='    mov r0, lr\n' + self.GLOBAL_STORE)
+
+    def test_the_real_shape_return_address_in_lr_is_admitted(self):
+        # The wrappers return with LR = the return address of their own scheduler call.
+        facts = self.derive()
+        self.assertEqual(facts.paths, 1)
+
     def test_an_unrestored_callee_saved_register_refuses(self):
         with self.assertRaisesRegex(ValueError, 'R5 is not restored at the return'):
             self.derive(wrapper_extra='    movs r5, #0')
