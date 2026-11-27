@@ -78,6 +78,50 @@ CONDITIONAL = "cmp r4, #1\nbne skip2\nsite2:\nstrh r4, [r5]\nadds r5, #2\nskip2:
 TWICE = ("site2:\nstrh r4, [r5]\nadds r5, #2\ncmp r7, #1\nbne stay\nmov r0, sb\nbl query\ncmp r0, #0\n"
          "beq done\nstay:")
 DONE = LOOP.replace("ble loop\nmov r0, r8", "ble loop\ndone:\nmov r0, r8")
+# An unknown choice sets r2 to 1 (arm A) or 2 (arm B) before the first store; after it only arm A may
+# return, then `movs r2, #0` makes both arms' states equal, and every later pass stores.
+MERGED = """push {{r4, r5, r6, r7, lr}}
+mov r7, sb
+mov r6, r8
+push {{r6, r7}}
+mov sb, r0
+adds r6, r1, #0
+adds r5, r1, #0
+movs r0, #0
+strh r0, [r6]
+strh r0, [r6, #2]
+movs r7, #0
+movs r4, #5
+adds r1, r7, #0
+mov r0, sb
+bl query
+cmp r0, #0
+CHOICE
+site:
+strh r4, [r6]
+adds r6, #2
+cmp r2, #1
+bne z
+adds r1, r7, #0
+mov r0, sb
+bl query
+cmp r0, #0
+beq done
+z:
+movs r2, #0
+adds r7, #1
+cmp r7, #4
+ble site
+done:
+mov r0, r8
+pop {{r3, r4}}
+mov r8, r3
+mov sb, r4
+pop {{r4, r5, r6, r7}}
+pop {{r1}}
+bx r1"""
+MERGED_A = MERGED.replace("CHOICE", "beq armB\narmA:\nmovs r2, #1\nb site\narmB:\nmovs r2, #2\nb site")
+MERGED_B = MERGED.replace("CHOICE", "bne armA\narmB:\nmovs r2, #2\nb site\narmA:\nmovs r2, #1\nb site")
 # The owner with a u16[6] (twelve bytes) instead of a u16[2].
 CALLER12 = CALLER.replace("sub sp, #4", "sub sp, #12").replace("add sp, #4", "add sp, #12")
 
@@ -545,6 +589,21 @@ class StoreBoundTests(unittest.TestCase):
                          rf"store bound: in 0x{self.callee:08X} \(called at 0x0800000[0-9A-F]\), once the store at "
                          rf"0x{site2:08X} first runs no replayed continuation returns and some end at its bound: "
                          rf"the code itself runs the store more often than its row allows$")
+
+    def test_a_forced_overrun_reached_through_a_merged_state_refuses(self):
+        # From the independent review: arm B's first store leads only to the state arm A's continuation also
+        # reaches, and from there every pass stores, past the two the frame allows; arm A may return.  Arm
+        # B's overrun is reached through a state the replay may already have seen, so the graph must keep
+        # edges into seen states.  Both exploration orders; the plain refusal stands, with or without a row.
+        for name, loop in (("arm A first", MERGED_A), ("arm B first", MERGED_B)):
+            self.build(loop=loop)
+            for premises in (None, self.premises([(self.callee, self.site, 2)])):
+                with self.subTest(order=name, entry=premises is not None), self.assertRaises(ValueError) as caught:
+                    store_bound.walk(self.make_proof, self.run_walk, self.body, BASE, None, premises)
+                self.assertNotIsInstance(caught.exception, store_bound.StoreBoundRefusal)
+                self.assertEqual(store_bound.triggered(caught.exception), (self.callee, self.site))
+                self.assertRegex(str(caught.exception.__cause__),
+                                 rf"once the store at 0x{self.site:08X} first runs no replayed continuation returns")
 
     def test_a_bound_reached_only_after_a_later_execution_is_a_count(self):
         # The second site stores on every pass, and after its first store the call may return on an unknown
