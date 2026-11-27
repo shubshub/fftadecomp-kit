@@ -382,7 +382,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "921c17659a8da6df467dd4d67ad9858896a17cb4015f541d30a50a4e5f97c41f",
+        "acknowledged_cursor": 7210847020,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "921c17659a8da6df467dd4d67ad9858896a17cb4015f541d30a50a4e5f97c41f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08125DE8\",\"who\":\"claude-ffta2\",\"claim_id\":7210536817,\"reason\":\"byte-identical, parked: kit refuses (kit #225 compiler memcpy for a struct assignment)\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-27T05:40:58Z",
+          "id": 7210847020,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-27T05:40:58Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "de34d6af235dde556077639e53467b184114306ad43867f1b68b2df0e5638f43",
+        "result": {
+          "address": "0x08125DE8",
+          "claim_id": 7210536817,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 7210847020,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
