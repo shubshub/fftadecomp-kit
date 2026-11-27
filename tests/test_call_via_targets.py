@@ -68,6 +68,12 @@ u16 func_08000200(u16 value, void (*hook)(void))
 # The callee hands the buffer to a callback it loads from its own pool.
 POOL_CALLBACK = (f"push {{lr}}\nadds r0, r1, #0\nldr r2, 1f\nbl 0x{R2:08X}\npop {{r0}}\nbx r0\n"
                  ".align 2\n1: .word 0x08000501")
+# The callee's own pool literal kept on its stack and reloaded before the call (a push and a pop, or a
+# store and a load): frame words are never value sources, so the reloaded target is not exact.
+PUSHED = (f"push {{lr}}\nadds r0, r1, #0\nldr r2, 1f\npush {{r2}}\npop {{r2}}\nbl 0x{R2:08X}\npop {{r0}}\nbx r0\n"
+          ".align 2\n1: .word 0x08000501")
+SPILLED = (f"push {{lr}}\nsub sp, #4\nadds r0, r1, #0\nldr r2, 1f\nstr r2, [sp]\nldr r2, [sp]\nbl 0x{R2:08X}\n"
+           "add sp, #4\npop {r0}\nbx r0\n.align 2\n1: .word 0x08000501")
 # The target is read from the buffer: no exact value.
 MEMORY = f"push {{lr}}\nldr r2, [r1]\nadds r0, r1, #0\nbl 0x{R2:08X}\npop {{r0}}\nbx r0"
 INSIDE = "movs r1, #0\nstrh r1, [r0]\nstrh r1, [r0, #6]\nbx lr"
@@ -650,6 +656,13 @@ class CallViaNativeTests(unittest.TestCase):
                 (line,) = self.targets(report)
                 self.assertIn(f"_call_via_r2 = 0x{CALLBACK | 1:08X} -> 0x{CALLBACK:08X} (fact; origins pool", line)
                 self.assertFalse(self.replays(report.replace(line + "\n", ""), root))
+
+    def test_target_reloaded_from_a_frame_word_stays_unresolved(self):
+        for name, worker in (("pushed", PUSHED), ("spilled", SPILLED)):
+            with self.subTest(name):
+                output = self.refused(self.fixture(name, worker),
+                                      "non-leaf indirect control flow requires linked CFG verification")
+                self.assertNotIn(f"0x{CALLBACK | 1:08X} -> 0x{CALLBACK:08X}", output or "")
 
     def test_target_read_from_memory_stays_unresolved(self):
         self.refused(self.fixture("memory", MEMORY),
