@@ -96,7 +96,22 @@ class TextRuleTests(unittest.TestCase):
                 ("a later declarator", STATE + "void f(void) { State *p = state, local;" + read),
                 ("a local typedef", STATE + "void f(void) { typedef State Mine; Mine local;" + read),
                 ("a parameter", STATE + outer + "void f(int n, Outer copy) {" + read),
-                ("a K&R parameter", STATE + "void f(copy) State copy; {" + read)):
+                ("a K&R parameter", STATE + "void f(copy) State copy; {" + read),
+                # qualifiers round a typedef's spelling, and every by-value declarator of a typedef
+                ("a qualified typedef", STATE + "typedef const State Fixed;\nvoid f(void) { Fixed local;" + read),
+                ("a qualifier after the spelling", STATE + "typedef State const Fixed;\nvoid f(void) { Fixed local;"
+                 + read),
+                ("a by-value declarator after a pointer one", STATE + "typedef State *Handle, Copy;\n"
+                 "void f(void) { Copy local;" + read),
+                ("a parenthesised declarator", STATE + "typedef State (Boxed);\nvoid f(void) { Boxed local;" + read),
+                ("a qualified outer struct", STATE + "typedef const struct { unsigned int tag; State inner; } Outer;\n"
+                 "void f(void) { Outer local;" + read),
+                ("an outer struct after a pointer declarator", STATE + "typedef struct { unsigned int tag; "
+                 "State inner; } *Handle, Outer;\nvoid f(void) { Outer local;" + read),
+                ("the struct after a pointer declarator", STATE.replace("} State;", "} *Handle, State;")
+                 + "void f(void) { State local;" + read),
+                ("a qualified struct", STATE.replace("typedef struct", "typedef const struct")
+                 + "void f(void) { State local;" + read)):
             with self.subTest(label):
                 self.assertTrue(local(text), label)
         # pointers, and globals, are not local copies
@@ -106,7 +121,14 @@ class TextRuleTests(unittest.TestCase):
                  "void f(void) { Holder h;" + read),
                 ("a pointer parameter", STATE + outer + "void f(Outer *copy, u16 n) {" + read),
                 ("a global outer", STATE + outer + "Outer g;\nvoid f(void) {" + read),
-                ("a cast and sizeof", STATE + "void f(void) { x = sizeof(State) + ((State *)state)->tag;" + read)):
+                ("a cast and sizeof", STATE + "void f(void) { x = sizeof(State) + ((State *)state)->tag;" + read),
+                ("a pointer typedef", STATE + "typedef State *Handle;\nvoid f(void) { Handle h;" + read),
+                ("a parenthesised pointer typedef", STATE + "typedef State (*Handle);\nvoid f(void) { Handle h;"
+                 + read),
+                ("qualified pointer typedefs", STATE + "typedef const State *Handle, *Other;\n"
+                 "void f(void) { Handle h; Other o;" + read),
+                ("a pointer typedef of an outer struct", STATE + "typedef struct { unsigned int tag; State inner; } "
+                 "*Handle;\nvoid f(void) { Handle h;" + read)):
             with self.subTest(label):
                 self.assertEqual(local(text), [], label)
 

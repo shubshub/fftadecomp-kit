@@ -1509,24 +1509,21 @@ def matching_brace(words, brace):
     return close
 
 
-def declares_by_value(words, j, spelling):
-    """does the declaration whose type spelling starts at words[j] declare an object of that type, not only
-    pointers to it?  Every declarator of `T a, *b;` counts; in a parameter list, only the parameter's own"""
-    n = len(spelling)
-    if words[j:j + n] != list(spelling):
-        return False
-    single = j > 0 and words[j - 1] in ("(", ",")
-    k = j + n
+def declarators(words, k, single=False):
+    """(by value, first word, end) for each declarator of a declaration, from words[k], just after its type
+    spelling, to its `;` (only the first, with single, as in a parameter list).  A declarator is by value when,
+    after any qualifiers, it starts with an identifier or with a `(` that no `*` follows: `a`, `a[2]` and `(a)`
+    are, `*a` and `(*a)` are not.  It stops at a word that starts no declarator (a cast's `)`)"""
     while k < len(words):
         while k < len(words) and words[k] in QUALIFIERS:
             k += 1
         if k >= len(words):
-            return False
-        if IDENTIFIER.fullmatch(words[k]) and words[k] not in C_KEYWORDS or \
-                words[k] == "(" and words[k + 1:k + 2] != ["*"]:
-            return True
-        if words[k] not in ("*", "("):
-            return False
+            return
+        first = k
+        by_value = bool(IDENTIFIER.fullmatch(words[k]) and words[k] not in C_KEYWORDS or
+                        words[k] == "(" and words[k + 1:k + 2] != ["*"])
+        if not by_value and words[k] not in ("*", "("):
+            return
         depth = 0
         while k < len(words):
             word = words[k]
@@ -1534,29 +1531,63 @@ def declares_by_value(words, j, spelling):
                 depth += 1
             elif word in (")", "]", "}"):
                 if depth == 0:
-                    return False
+                    break
                 depth -= 1
             elif depth == 0 and word in (",", ";"):
                 break
             k += 1
-        if k >= len(words) or words[k] == ";" or single:
-            return False
+        yield by_value, first, k
+        if k >= len(words) or words[k] != "," or single:
+            return
         k += 1
-    return False
+
+
+def declarator_name(words, first, end):
+    """the identifier a declarator declares: its first identifier (any array suffix comes after it)"""
+    for word in words[first:end]:
+        if IDENTIFIER.fullmatch(word) and word not in C_KEYWORDS and word not in QUALIFIERS:
+            return word
+    return None
+
+
+def declares_by_value(words, j, spelling):
+    """does the declaration whose type spelling starts at words[j] declare an object of that type, not only
+    pointers to it?  Every declarator of `T a, *b;` counts; in a parameter list, only the parameter's own"""
+    n = len(spelling)
+    if words[j:j + n] != list(spelling):
+        return False
+    single = j > 0 and words[j - 1] in ("(", ",")
+    return any(by_value for by_value, _, _ in declarators(words, j + n, single))
+
+
+def typedef_names(words, k):
+    """the names a typedef's declarators, from words[k], give the type itself (or an array of it)"""
+    return {(name,) for by_value, first, end in declarators(words, k) if by_value
+            for name in [declarator_name(words, first, end)] if name}
+
+
+def after_typedef(words, k):
+    """is words[k] the type spelling of a typedef, after any qualifiers (`typedef const T`)?"""
+    k -= 1
+    while k >= 0 and words[k] in QUALIFIERS:
+        k -= 1
+    return k >= 0 and words[k] == "typedef"
 
 
 def holding_types(words, names):
     """names, grown to a fixed point by every type that holds one of them by value: a typedef of one
-    (`typedef T Alias;`, or an array of T), and a struct or union with a member of one"""
+    (`typedef T Alias;`, an array of T, every by-value declarator of `typedef T *P, Alias;` or `typedef T (Alias);`,
+    with qualifiers on either side of T), and a struct or union with a member of one"""
     while True:
         before = set(names)
         for j, word in enumerate(words):
             if word == "typedef":
+                k = j + 1
+                while k < len(words) and words[k] in QUALIFIERS:
+                    k += 1
                 for spelling in list(names):
-                    k = j + 1 + len(spelling)
-                    if words[j + 1:k] == list(spelling) and k + 1 < len(words) and \
-                            IDENTIFIER.fullmatch(words[k]) and words[k + 1] in (";", "[", ","):
-                        names.add((words[k],))
+                    if words[k:k + len(spelling)] == list(spelling):
+                        names |= typedef_names(words, k + len(spelling))
             elif word == "{" and j >= 1:
                 tagged = j >= 2 and words[j - 2] in ("struct", "union") and IDENTIFIER.fullmatch(words[j - 1])
                 if not tagged and words[j - 1] not in ("struct", "union"):
@@ -1566,10 +1597,8 @@ def holding_types(words, names):
                     continue
                 if tagged:
                     names.add((words[j - 2], words[j - 1]))
-                head = j - 2 if tagged else j - 1
-                if words[head - 1:head] == ["typedef"] and close + 1 < len(words) and \
-                        IDENTIFIER.fullmatch(words[close + 1]):
-                    names.add((words[close + 1],))
+                if after_typedef(words, j - 2 if tagged else j - 1):
+                    names |= typedef_names(words, close + 1)
         if names == before:
             return names
 
@@ -1581,10 +1610,9 @@ def typed_copy_locals(words, tokens, brace, symbol):
     struct or union with a member of it (holding_types)"""
     close = matching_brace(words, brace)
     names = set()
-    if words[brace - 1:brace] == ["struct"] and words[brace - 2:brace - 1] == ["typedef"] or \
-            words[brace - 3:brace - 2] == ["typedef"] and words[brace - 2:brace - 1] == ["struct"]:
-        if close + 1 < len(words) and re.fullmatch(r"[A-Za-z_]\w*", words[close + 1]):
-            names.add((words[close + 1],))
+    if words[brace - 1:brace] == ["struct"] and after_typedef(words, brace - 1) or \
+            words[brace - 2:brace - 1] == ["struct"] and after_typedef(words, brace - 2):
+        names |= typedef_names(words, close + 1)
     if words[brace - 2:brace - 1] == ["struct"] and re.fullmatch(r"[A-Za-z_]\w*", words[brace - 1]):
         names.add(("struct", words[brace - 1]))
     names = holding_types(words, names)
