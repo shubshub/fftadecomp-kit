@@ -3,6 +3,7 @@
 import argparse
 import builtins
 import copy
+import report_fixtures
 from contextlib import redirect_stdout
 import hashlib
 import io
@@ -336,7 +337,7 @@ class SoftwareDoubleTests(unittest.TestCase):
         report = self.native_report()
         opening, reading = self.patched_rom()
         with opening, reading:
-            self.assertTrue(profile.report_matches(report, self.root, BASE))
+            self.assertTrue(profile.report_matches(report_fixtures.uncarried(report), self.root, BASE))
             (self.root / "src/08000000.c").write_text(source.replace("a * b", "a + b"))
             self.assertFalse(profile.report_matches(report, self.root, BASE))
 

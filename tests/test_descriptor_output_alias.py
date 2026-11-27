@@ -13,6 +13,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 import match
+import report_fixtures
 import match_evidence
 import owner_admission_profile as owner
 import descriptor_output_alias_profile as profile
@@ -139,7 +140,7 @@ class NativeTests(unittest.TestCase):
         buffers=self.result[1]['proof']['buffers']
         self.assertTrue(any(row['address']==B for row in buffers['frame_aliases']))
         self.assertTrue(any(row['kind']=='pointer' for row in buffers['word_reads']))
-        self.assertTrue(match_evidence.report_matches(self.report,self.root,A))
+        self.assertTrue(match_evidence.report_matches(report_fixtures.carried(self.report, self.root, A), self.root, A))
 
     def test_structural_inventory_cannot_admit_unsafe_actual_effects(self):
         bad='''struct Output { unsigned char *bytes; };

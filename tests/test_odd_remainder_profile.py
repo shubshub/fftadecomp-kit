@@ -15,6 +15,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB
 import match
+import standing_premise
 import match_evidence
 import status
 import modsi3_profile as remainder
@@ -118,7 +119,7 @@ class NativeTests(unittest.TestCase):
             with patch.object(sys, 'argv', options), redirect_stdout(io.StringIO()):
                 self.assertEqual(match.main(), 0)
             report = (root/'docs/match/081315F8.md').read_text()
-            self.assertEqual(report, driver.render(result))
+            self.assertEqual(standing_premise.strip(report, root, address), driver.render(result))
             counted = status.collect(str(root), verify=True)
             self.assertEqual((counted[1], counted[3], counted[4]), (1, 66, []))
             with patch.object(sys, 'argv', options+['--switch-profile', 'two-constants-v2']):

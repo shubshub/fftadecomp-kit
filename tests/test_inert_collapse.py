@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import match
 import match_evidence
+import report_fixtures
 import inert_collapse
 import addressed_signed_runtime_profile as addressed
 import test_addressed_signed_runtime_profile as addressed_fixtures
@@ -473,16 +474,19 @@ class SelectorRecordTests(unittest.TestCase):
             status, output = run_main(self.argv(root))
             self.assertEqual(status, 0, output)
             report = (root / f"docs/match/{A:08X}.md").read_text()
-            self.assertEqual(report, match_evidence.carry_trace_records(addressed.render(result), [RECORD]))
+            # the selector's report, then the trace records, then the standing frame premise line
+            untraced = report_fixtures.carried(addressed.render(result), root, A)
+            self.assertEqual(report, report_fixtures.carried(
+                match_evidence.carry_trace_records(addressed.render(result), [RECORD]), root, A))
             printed = output.splitlines()
             self.assertLess(printed.index(RECORD.removeprefix("* ")), printed.index("verdict MATCH - byte identical"))
             self.assertTrue(match_evidence.report_matches(report, root, A))
-            self.assertFalse(match_evidence.report_matches(addressed.render(result), root, A))
+            self.assertFalse(match_evidence.report_matches(untraced, root, A))
             self.assertFalse(match_evidence.report_matches(report.replace("line 9", "line 8"), root, A))
         with patch.object(addressed, "build", return_value=result), \
                 patch.object(match, "inert_trace_records", return_value=[]):
             self.assertFalse(match_evidence.report_matches(report, root, A))
-            self.assertTrue(match_evidence.report_matches(addressed.render(result), root, A))
+            self.assertTrue(match_evidence.report_matches(untraced, root, A))
 
     def test_a_refused_trace_is_implausible_before_the_selector(self):
         root, _ = self.tree()

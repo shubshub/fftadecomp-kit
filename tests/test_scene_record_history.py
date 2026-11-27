@@ -10,6 +10,7 @@ import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import finite_local_word_loop_profile as finite
 import match
+import standing_premise
 import match_evidence
 import owner_admission_profile as admission
 import scene_record_history as scene
@@ -52,7 +53,7 @@ class SceneHistory(unittest.TestCase):
             report = (self.root/'docs/match'/f'{address:08X}.md').read_text()
             self.assertTrue(match_evidence.report_matches(report, self.root, address))
         report = (self.root/'docs/match/080C68EC.md').read_text()
-        self.assertEqual(report, admission.render(scene.OWNER, self.result))
+        self.assertEqual(standing_premise.strip(report, self.root, scene.OWNER), admission.render(scene.OWNER, self.result))
         self.assertFalse(match_evidence.report_matches(
             report.replace('"list_bound_proved_from_ROM":false', '"list_bound_proved_from_ROM":true'),
             self.root, scene.OWNER))

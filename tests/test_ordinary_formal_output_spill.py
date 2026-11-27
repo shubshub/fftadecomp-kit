@@ -11,6 +11,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import match
+import report_fixtures
 import owner_admission_profile as owner
 if os.environ.get('FORMAL_SPILL_BASELINE'):
     import named_data_buffer_profile as profile
@@ -199,8 +200,9 @@ class ConsumerTests(unittest.TestCase):
         values=self.values();manifest,verified=owner.verify(**values)
         result=(values['data'],manifest,'fresh-source',values['mapping'],values['index'],b'{}',values['rom'],len(verified),b'original-ELF')
         report=owner.render(A,result)
+        report_fixtures.rom_image(self,values['rom'])
         with patch.object(owner,'build',return_value=result):
-            self.assertTrue(match_evidence.report_matches(report,Path('.'),A))
+            self.assertTrue(match_evidence.report_matches(report_fixtures.carried(report, Path('.'), A), Path('.'), A))
         stale=list(result);stale[2]='different-source'
         with patch.object(owner,'build',return_value=tuple(stale)):
             self.assertFalse(match_evidence.report_matches(report,Path('.'),A))

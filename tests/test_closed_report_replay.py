@@ -124,12 +124,12 @@ class Root:
         listing, _, _ = match.report_listing(instructions, bytes(body), BASE, len(body), True)
         parts.setdefault("mapping", self.mapping)
         parts.setdefault("data_mapping", DATA)
-        return match.render_report(
+        return report_fixtures.carried(match.render_report(
             addr=BASE, src_rel="src/08000000.c", schema=schema,
             fingerprint=evidence.source_fingerprint(self.path, BASE),
             compiler=f"{match.DEFAULT_CC} {match.DEFAULT_FLAGS}", want=bytes(body), span=len(body),
             got_body=bytes(body), verdict="MATCH - byte identical", same_bytes=len(body), listing=listing,
-            framed_profile=match.uses_stack_frame(instructions), **parts)
+            framed_profile=match.uses_stack_frame(instructions), **parts), self.path, BASE)
 
 
 class ClosureAssertions:

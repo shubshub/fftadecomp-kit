@@ -25,6 +25,7 @@ evidence = fixtures.fixtures.evidence
 import data_buffer_profile as data_buffer
 import report_fixtures
 import dma_fill_profile as dma
+import standing_premise
 
 BASE = fixtures.BASE
 ROOT = Path(__file__).resolve().parents[1]
@@ -760,7 +761,9 @@ class DmaFillReportTests(unittest.TestCase):
                 self.assertEqual(admitted, lines if framed else [])
         # the field check holds the block to the writer's place: right after the stack-frame line
         data, mapping = self.tree(source())
-        report = self.report(data, mapping, lines, schema=evidence.FRAMED_SCHEMA).splitlines()
+        # report_matches removes the standing frame premise line before the field check runs
+        report = standing_premise.strip(self.report(data, mapping, lines, schema=evidence.FRAMED_SCHEMA),
+                                        self.root, BASE).splitlines()
         fields.check(report, evidence.FRAMED_SCHEMA, BASE, self.root)
         moved = [line for line in report if not line.startswith(dma.MARKER)]
         moved[moved.index("* source plausibility: plausible"):0] = lines

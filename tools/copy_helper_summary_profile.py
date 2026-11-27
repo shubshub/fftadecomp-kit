@@ -65,7 +65,8 @@ refused, as before.
 Not proved: the physical stack, the readability or writability of a source or
 destination that is not local, that such a range does not overlap the live
 frame, the helper's save words or code (the standing premise of the buffer
-walk for every untracked pointer), or termination beyond the bounded run.
+walk for every untracked pointer, stated by standing_premise.LINE in every
+framed report), or termination beyond the bounded run.
 """
 from dataclasses import dataclass
 import hashlib

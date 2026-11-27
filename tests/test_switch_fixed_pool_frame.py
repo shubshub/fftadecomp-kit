@@ -488,7 +488,7 @@ class ReportTests(unittest.TestCase):
     def test_rebuild_and_status_forward_the_selector(self):
         import rebuild
         import status
-        self.assertEqual(rebuild.saved_profile_arguments(self.report(), self.root, BASE),
+        self.assertEqual(rebuild.saved_profile_arguments(report_fixtures.carried(self.report(), self.root, BASE), self.root, BASE),
                          ["--switch-data-profile", frame.FIXED_SELECTOR])
         (self.root / "config").mkdir()
         (self.root / "config/functions.json").write_bytes(self.functions)

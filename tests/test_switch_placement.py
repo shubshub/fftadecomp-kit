@@ -1,5 +1,6 @@
 import contextlib
 import copy
+import report_fixtures
 import hashlib
 import io
 import json
@@ -245,8 +246,8 @@ class PlacementTests(unittest.TestCase):
 
                     with self.trusted_fixture(root, rom):
                         with patch.object(profile, "_compile_object", side_effect=inject(good)):
-                            report = profile.render_report(address, profile._build_from_source(root, address, self.policy), self.policy)
-                            self.assertTrue(match_evidence.report_matches(report, root, address))
+                            report = report_fixtures.carried(profile.render_report(address, profile._build_from_source(root, address, self.policy), self.policy), root, address)
+                            self.assertTrue(match_evidence.report_matches(report_fixtures.carried(report, root, address), root, address))
                         with patch.object(profile, "_compile_object", side_effect=inject(bad)), \
                                 patch.object(match_evidence, "switch_report_matches") as legacy:
                             self.assertFalse(match_evidence.report_matches(report, root, address))
@@ -385,7 +386,7 @@ class PlacementTests(unittest.TestCase):
         root, rom, _ = self.prepare(address)
         compile_original = profile._compile_object
         with self.trusted_fixture(root, rom):
-            report = profile.render_report(address, profile._build_from_source(root, address, self.policy), self.policy)
+            report = report_fixtures.carried(profile.render_report(address, profile._build_from_source(root, address, self.policy), self.policy), root, address)
             for name in ("f.raw.s", "f.s", "f.o"):
                 def corrupt(runner, workspace, *args, **kwargs):
                     result = compile_original(runner, workspace, *args, **kwargs)
@@ -446,7 +447,7 @@ class PlacementTests(unittest.TestCase):
             return result
 
         with self.trusted_fixture(root, rom):
-            clean_report = profile.render_report(address, profile._build_from_source(root, address, self.policy), self.policy)
+            clean_report = report_fixtures.carried(profile.render_report(address, profile._build_from_source(root, address, self.policy), self.policy), root, address)
             stdout = io.StringIO()
             with patch.object(profile, "_object_bytes", side_effect=after_object), \
                     patch.object(inert_spin_profile, "validate_span", side_effect=after_span), \
@@ -595,7 +596,7 @@ class PlacementTests(unittest.TestCase):
 
         try:
             with self.trusted_fixture(root, rom):
-                clean_report = profile.render_report(address, profile._build_from_source(root, address, self.policy), self.policy)
+                clean_report = report_fixtures.carried(profile.render_report(address, profile._build_from_source(root, address, self.policy), self.policy), root, address)
                 stdout = io.StringIO()
                 issuance_timeout, replay_timeout = False, False
                 with patch.object(profile, "_artifact_snapshot", side_effect=substitute), \
@@ -687,7 +688,7 @@ class PlacementTests(unittest.TestCase):
         root, rom, _ = self.prepare(address)
         with self.trusted_fixture(root, rom):
             result = profile._build_from_source(root, address)
-            report = profile.render_report(address, result)
+            report = report_fixtures.carried(profile.render_report(address, result), root, address)
             manifest = json.loads(result.manifest_json)
             for name, value in (("section_base", address), ("function_offset", 0), ("prefix_size", True),
                                 ("rule", "different"), ("original_elf_sha256", "0" * 64),

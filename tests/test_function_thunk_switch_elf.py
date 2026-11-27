@@ -20,6 +20,7 @@ sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import match
+import report_fixtures
 import function_thunk_profile as profile
 
 BASE = match.ROM_BASE
@@ -177,7 +178,7 @@ class FunctionThunkSwitchElfTests(unittest.TestCase):
         self.assertEqual(len(profile.verify(self.body, BASE, self.rom, self.mapping,
                          self.index, self.objects, self.manifest)), 124)
         report = self.native_report()
-        self.assertTrue(profile.report_matches(report, self.root, BASE))
+        self.assertTrue(profile.report_matches(report_fixtures.uncarried(report), self.root, BASE))
         self.assertEqual(hashlib.sha256((self.root / "original.o").read_bytes()).hexdigest(),
                          self.original_hash)
         (self.root / "src/08000000.c").write_text(SOURCE.replace("value - 7", "value - 8"))

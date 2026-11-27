@@ -12,6 +12,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import match
+import report_fixtures
 import private_float_pack_admission_profile as admission
 import private_float_selected_record_inventory as inventory
 import software_float_profile as runtime
@@ -180,7 +181,7 @@ class SelectedRecordTests(unittest.TestCase):
             self.assertEqual(result['body'], selected[0])
             report = admission.render(result)
             self.assertEqual(admission.selector_for_report(report), admission.SELECTED_RECORD_SELECTOR)
-            self.assertTrue(old.evidence.report_matches(report, root, A))
+            self.assertTrue(old.evidence.report_matches(report_fixtures.carried(report, root, A), root, A))
 
 
 if __name__ == '__main__':

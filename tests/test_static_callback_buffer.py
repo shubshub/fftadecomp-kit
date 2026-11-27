@@ -1,6 +1,7 @@
 """Natural fixed-compiler callback fixtures and source-bound fresh replay."""
 import argparse
 import copy
+import report_fixtures
 import json
 import os
 from pathlib import Path
@@ -241,7 +242,7 @@ void func_08011000(unsigned char *bytes, void (*callback)(unsigned char *))
             owner.original_bindings(image,A,self.result[6],self.result[3],self.result[5],selector=buffers.SELECTOR)
 
     def test_fresh_source_report_and_original_elf_identity(self):
-        self.assertTrue(match_evidence.report_matches(self.report,self.root,A))
+        self.assertTrue(match_evidence.report_matches(report_fixtures.carried(self.report, self.root, A), self.root, A))
         altered=self.report.replace('"original_elf_sha256":"','"original_elf_sha256":"0')
         self.assertFalse(match_evidence.report_matches(altered,self.root,A))
         for name in ('src/08010000.c','config/functions.json','symbols/functions.txt','config/data_symbols.json'):

@@ -13,6 +13,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode=True
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 import match
+import report_fixtures
 import match_evidence
 import owner_admission_profile as owner
 import descriptor_cursor_value_profile as profile
@@ -61,7 +62,7 @@ class NativeTests(unittest.TestCase):
         cls.temporary=tempfile.TemporaryDirectory(prefix='descriptor_cursor_',dir=scratch)
         cls.root=Path(cls.temporary.name);cls.data,cls.bindings,cls.original=fixture(cls.root)
         cls.environment=patch.dict(os.environ,FFTA_ROM=str(cls.root/'baserom.bin'));cls.environment.start()
-        cls.result=owner.build(cls.root,A,selector=profile.SELECTOR);cls.report=owner.render(A,cls.result)
+        cls.result=owner.build(cls.root,A,selector=profile.SELECTOR);cls.report=report_fixtures.carried(owner.render(A,cls.result),cls.root,A)
 
     @classmethod
     def tearDownClass(cls):cls.environment.stop();cls.temporary.cleanup()

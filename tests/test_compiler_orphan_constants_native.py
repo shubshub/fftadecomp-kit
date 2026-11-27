@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 import match
+import report_fixtures
 import match_evidence
 import library_units as units
 import owner_admission_profile as owner
@@ -75,7 +76,7 @@ class NativeTests(unittest.TestCase):
         self.assertEqual(manifest['transport']['excluded_ROM_credit'],0)
         self.assertEqual(manifest['native']['profile'],owner.ACYCLIC_SCHEMA)
         self.assertTrue(native.report_matches(self.report,self.root,A))
-        self.assertTrue(match_evidence.report_matches(self.report,self.root,A))
+        self.assertTrue(match_evidence.report_matches(report_fixtures.carried(self.report, self.root, A), self.root, A))
 
     def test_legacy_original_binding_and_linker_policies_stay_strict(self):
         with self.assertRaisesRegex(ValueError,'unexpected nonempty allocated section'):
@@ -140,7 +141,7 @@ class NativeTests(unittest.TestCase):
             self.assertNotIn('verdict MATCH - byte identical',result.stdout.splitlines())
             self.assertFalse(match_evidence.report_matches(self.report,self.root,A))
         finally:(self.root/units.TABLE).write_bytes(self.table)
-        self.assertTrue(match_evidence.report_matches(self.report,self.root,A))
+        self.assertTrue(match_evidence.report_matches(report_fixtures.carried(self.report, self.root, A), self.root, A))
 
     def test_actual_orphan_export_reference_and_addend_mutations_refuse(self):
         header=struct.unpack_from('<HHIIIIIHHHHHH',self.original,16)

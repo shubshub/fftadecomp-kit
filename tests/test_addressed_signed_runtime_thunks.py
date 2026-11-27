@@ -23,6 +23,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import match
+import report_fixtures
 import match_evidence as evidence
 import owner_admission_profile as owner
 import owner_graph_profile as graph
@@ -322,7 +323,7 @@ class SignedRuntimeThunkTests(unittest.TestCase):
         self.assertEqual(manifest['frame']['schema'], 'thumb-same-owner-long-bl-restoring-frame-v1')
         self.assertEqual(profile.verify(**values, manifest=manifest, selector=THUNKS_DATA)[0], manifest)
         with patch.dict(os.environ, FFTA_ROM=str(self.table/'baserom.bin')):
-            self.assertTrue(evidence.report_matches(profile.render(result), self.table, A))
+            self.assertTrue(evidence.report_matches(report_fixtures.carried(profile.render(result), self.table, A), self.table, A))
 
     # Existing selectors keep their boundaries ---------------------------
 

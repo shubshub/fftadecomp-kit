@@ -548,7 +548,7 @@ class UnsignedThunkSourceTests(unittest.TestCase):
         with patch.object(evidence, 'report_rom_path', return_value=rom_path), \
                 patch.object(thunks, 'verify_source', return_value=True) as source:
             self.assertTrue(thunks.report_matches(report, root, A))
-            self.assertTrue(evidence.report_matches(report, root, A))
+            self.assertTrue(evidence.report_matches(report_fixtures.carried(report, root, A), root, A))
             source.reset_mock()
             for path in (root/'config/functions.json', root/'symbols/functions.txt', root/'config/data_symbols.json',
                          root/'include/context.h', root/f'src/{A:08X}.c'):

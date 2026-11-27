@@ -9,6 +9,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import match
+import report_fixtures
 import private_double_pack_effects_inventory as inventory
 import private_float_pack_admission_profile as admission
 import software_float_profile as runtime
@@ -95,7 +96,7 @@ class DoublePackClosureTests(unittest.TestCase):
                 result = admission.build(root, base.A,
                     base.old.arguments(owner_runtime_profile=admission.DOUBLE_PACK_SELECTOR))
                 self.assertEqual(len(result['manifest']['inventory']['helper_closure']), 3)
-                self.assertTrue(base.old.evidence.report_matches(admission.render(result), root, base.A))
+                self.assertTrue(base.old.evidence.report_matches(report_fixtures.carried(admission.render(result), root, base.A), root, base.A))
 
 
 if __name__ == '__main__':

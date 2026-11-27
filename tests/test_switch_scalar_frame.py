@@ -1,5 +1,6 @@
 import contextlib
 import copy
+import report_fixtures
 from dataclasses import replace
 import hashlib
 import io
@@ -236,8 +237,8 @@ class ScalarFrameTests(unittest.TestCase):
         root, rom, _ = self.prepare()
         with self.trusted_fixture(root, rom):
             result = profile._build_from_source(root, 0x08000000, self.policy)
-            report = profile.render_report(0x08000000, result, self.policy)
-            self.assertTrue(match_evidence.report_matches(report, root, 0x08000000))
+            report = report_fixtures.carried(profile.render_report(0x08000000, result, self.policy), root, 0x08000000)
+            self.assertTrue(match_evidence.report_matches(report_fixtures.carried(report, root, 0x08000000), root, 0x08000000))
             manifest = json.loads(result.manifest_json)
             malformed = []
             for change in ("missing", "extra", "policy", "units", "bool", "offset", "order", "no-allocation", "access", "duplicate"):
@@ -264,7 +265,7 @@ class ScalarFrameTests(unittest.TestCase):
                 elif change == "duplicate":
                     frame["accesses"].append(frame["accesses"][0])
                 rewritten = replace(result, manifest_json=profile.canonical(changed))
-                malformed.append((change, profile.render_report(0x08000000, rewritten, self.policy)))
+                malformed.append((change, report_fixtures.carried(profile.render_report(0x08000000, rewritten, self.policy), root, 0x08000000)))
             malformed += [
                 ("missing-selector", report.replace(f"* switch constants: {self.policy.selector}\n", "")),
                 ("duplicate-marker", report + f"* scalar frame: {profile.FRAME_SUMMARY}\n"),
@@ -292,7 +293,7 @@ class ScalarFrameTests(unittest.TestCase):
         header.write_text("typedef unsigned int scalar_word;\n")
         with self.trusted_fixture(root, rom):
             result = profile._build_from_source(root, 0x08000000, self.policy)
-            report = profile.render_report(0x08000000, result, self.policy)
+            report = report_fixtures.carried(profile.render_report(0x08000000, result, self.policy), root, 0x08000000)
             for relative in ("src/08000000.c", "include/scalar.h", "config/functions.json", "symbols/functions.txt", "fixture.rom"):
                 path = root / relative
                 original = path.read_bytes()
@@ -336,7 +337,7 @@ class ScalarFrameTests(unittest.TestCase):
                 self.assertNotIn("MATCH", output.getvalue())
                 self.assertFalse(profile._active.get())
                 self.assertEqual(list((root / "build").iterdir()), [])
-            self.assertTrue(match_evidence.report_matches(report, root, 0x08000000))
+            self.assertTrue(match_evidence.report_matches(report_fixtures.carried(report, root, 0x08000000), root, 0x08000000))
 
     def test_public_unframed_and_legacy_framed_selections_reject(self):
         for framed, selector in ((False, self.policy.selector), (True, profile.SELECTOR)):
@@ -412,7 +413,7 @@ class ScalarFrameTests(unittest.TestCase):
             arguments = ["match.py", "--root", str(root), "--switch-profile", self.policy.selector,
                          "--emit", "build/rejected.bin", f"{address:08X}"]
             with self.trusted_fixture(root, rom):
-                report = profile.render_report(address, profile._build_from_source(root, address, self.policy), self.policy)
+                report = report_fixtures.carried(profile.render_report(address, profile._build_from_source(root, address, self.policy), self.policy), root, address)
                 for name in ("f.elf", "f.linked.bin"):
                     for boundary in (1, 2):
                         for kind in ("fifo", "symlink"):

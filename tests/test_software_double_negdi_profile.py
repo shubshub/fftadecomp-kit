@@ -1,6 +1,7 @@
 """Original canonical integer-negation provenance in the binary64 profile."""
 
 import copy
+import report_fixtures
 import json
 import struct
 import unittest
@@ -38,7 +39,7 @@ class SoftwareDoubleNegationTests(unittest.TestCase):
         report = self.native_report()
         opening, reading = self.patched_rom()
         with opening, reading:
-            self.assertTrue(profile.report_matches(report, self.root, BASE))
+            self.assertTrue(profile.report_matches(report_fixtures.uncarried(report), self.root, BASE))
             (self.root / "src/08000000.c").write_text(SOURCE.replace("-value", "value"))
             self.assertFalse(profile.report_matches(report, self.root, BASE))
 

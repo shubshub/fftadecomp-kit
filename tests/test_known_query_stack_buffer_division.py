@@ -16,6 +16,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import match
+import report_fixtures
 import owner_admission_profile as owner
 import known_query_stack_buffer_profile as stack
 from test_known_query_stack_buffer import A, B, Q, fixture
@@ -296,7 +297,7 @@ class KnownQueryDivisionCompilerTests(unittest.TestCase):
             shutil.copytree(self.root, self.retained/'fixture-root')
         self.assertEqual(owner.selector_for_report(report), SELECTOR)
         self.assertTrue(owner.selected(report))
-        self.assertTrue(owner.report_matches(report, self.root, A))
+        self.assertTrue(owner.report_matches(report_fixtures.uncarried(report), self.root, A))
         # Every hostile replay changes a bound input or claimed observation.
         self.assertFalse(owner.report_matches(report.replace('maximum_additional_stack_bytes":4',
                                                              'maximum_additional_stack_bytes":8'), self.root, A))

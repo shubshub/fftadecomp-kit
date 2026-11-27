@@ -12,6 +12,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 import match
+import report_fixtures
 import match_evidence
 import owner_admission_profile as owner
 import protected_descriptor_word_profile as words
@@ -214,7 +215,7 @@ void func_08011000(struct Descriptor *descriptor)
         for field in ('word_reads','callbacks'):
             manifest=copy.deepcopy(self.result[1]);manifest['proof']['buffers'][field]=[]
             with self.assertRaisesRegex(ValueError,'fresh native replay'):self.replay(manifest=manifest)
-        self.assertTrue(match_evidence.report_matches(self.report,self.root,A))
+        self.assertTrue(match_evidence.report_matches(report_fixtures.carried(self.report, self.root, A), self.root, A))
         path=self.root/'src/08010000.c';raw=path.read_bytes()
         try:
             path.write_bytes(raw+b'\n');self.assertFalse(match_evidence.report_matches(self.report,self.root,A))

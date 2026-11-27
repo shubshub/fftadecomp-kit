@@ -11,6 +11,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import match
+import report_fixtures
 import private_float_pack_admission_profile as admission
 import private_double_inline_division_inventory as inventory
 import software_float_profile as runtime
@@ -197,7 +198,7 @@ class DoubleInlineDivisionTests(unittest.TestCase):
             result = admission.build(root, A, old.arguments(owner_runtime_profile=admission.DOUBLE_INLINE_DIVISION_SELECTOR))
             report = admission.render(result)
             self.assertEqual(admission.selector_for_report(report), admission.DOUBLE_INLINE_DIVISION_SELECTOR)
-            self.assertTrue(old.evidence.report_matches(report, root, A))
+            self.assertTrue(old.evidence.report_matches(report_fixtures.carried(report, root, A), root, A))
             with (root/f'src/{A:08X}.c').open('a') as stream: stream.write('\n')
             self.assertFalse(old.evidence.report_matches(report, root, A))
 

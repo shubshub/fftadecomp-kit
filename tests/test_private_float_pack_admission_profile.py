@@ -17,6 +17,7 @@ STAGED = Path(__file__).resolve().parents[1]
 PRODUCTION = Path(os.environ.get('FFTA_TEST_PRODUCTION_KIT', STAGED))
 sys.path[:0] = [str(STAGED/'tools'), str(PRODUCTION/'tools'), str(PRODUCTION/'tests')]
 import match
+import report_fixtures
 import match_evidence as evidence
 import private_float_pack_admission_profile as admission
 import private_float_pack_effects_inventory as inventory
@@ -287,7 +288,7 @@ class PrivateFloatPackAdmissionTests(unittest.TestCase):
         with self.project() as (root,fixture):
             result=self.result(root,fixture);report=admission.render(result)
             with patch.object(admission,'build',return_value=result) as rebuild:
-                self.assertTrue(evidence.report_matches(report,root,ADDRESS))
+                self.assertTrue(evidence.report_matches(report_fixtures.carried(report, root, ADDRESS), root, ADDRESS))
                 self.assertEqual(admission.text(rebuild.call_args.kwargs['expected']),admission.text(result['manifest']))
             for relative in (f'src/{ADDRESS:08X}.c','include/types.h','config/functions.json',
                              'symbols/functions.txt','config/data_symbols.json','synthetic.rom'):
@@ -325,7 +326,7 @@ class PrivateFloatPackAdmissionTests(unittest.TestCase):
                 self.assertFalse(evidence.report_matches(report,root,ADDRESS))
                 return result
             with patch.object(admission,'build',side_effect=recurse):
-                self.assertTrue(evidence.report_matches(report,root,ADDRESS))
+                self.assertTrue(evidence.report_matches(report_fixtures.carried(report, root, ADDRESS), root, ADDRESS))
             self.assertFalse(admission._replay.get())
 
     def test_issue_and_fresh_report_recompile_use_real_build_and_reject_changed_plausibility(self):
@@ -335,7 +336,7 @@ class PrivateFloatPackAdmissionTests(unittest.TestCase):
             report=(root/f'docs/match/{ADDRESS:08X}.md').read_text()
             self.assertEqual((root/'build/verified.bin').read_bytes(),fixture[0])
             self.assertEqual(len(commands),2)
-            self.assertTrue(evidence.report_matches(report,root,ADDRESS))
+            self.assertTrue(evidence.report_matches(report_fixtures.carried(report, root, ADDRESS), root, ADDRESS))
             self.assertEqual(len(commands),4)
             self.assertIn('"original_elf_sha256":',report)
             self.assertIn('"linked_elf_sha256":',report)
@@ -465,7 +466,7 @@ class PrivateFloatTerminalAlignmentTests(unittest.TestCase):
                 report=admission.render(result)
                 self.assertEqual(len(result['body']),38)
                 self.assertEqual(len(original['text']),40)
-                self.assertTrue(evidence.report_matches(report,root,ADDRESS))
+                self.assertTrue(evidence.report_matches(report_fixtures.carried(report, root, ADDRESS), root, ADDRESS))
                 self.assertEqual(len(commands),4)
                 self.assertIn('38/38 bytes',report)
 

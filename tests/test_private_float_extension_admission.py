@@ -12,6 +12,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import match
+import report_fixtures
 import private_float_pack_admission_profile as admission
 import private_float_extension_effects_inventory as inventory
 import software_float_profile as runtime
@@ -90,7 +91,7 @@ class ExtensionAdmissionTests(unittest.TestCase):
                 self.assertEqual(result['manifest']['selector'], admission.EXTENSION_SELECTOR)
                 report = admission.render(result)
                 self.assertEqual(admission.selector_for_report(report), admission.EXTENSION_SELECTOR)
-                self.assertTrue(old.evidence.report_matches(report, root, effects.A))
+                self.assertTrue(old.evidence.report_matches(report_fixtures.carried(report, root, effects.A), root, effects.A))
 
     def test_status_preserves_extension_selector_for_native_replay(self):
         case = status_fixtures.StatusPrivateFloatRoutingTests()

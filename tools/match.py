@@ -73,6 +73,7 @@ import released_scratch_profile as released_scratch
 import iwram_image_profile as iwram_image
 import fresh_block_profile as fresh_block
 import readonly_initializer_profile as readonly
+import standing_premise
 import stack_pointer_compare_profile as sp_compare
 import plausible as plausibility
 import volatile_semantics
@@ -116,7 +117,8 @@ from match_evidence import (BUFFER_SCHEMA, BUFFER_SUMMARY, CALL_SUMMARY, DATA_SC
                             STACK_SUMMARY, data_snapshot, mapping_fingerprint,
                             function_address_fingerprint, function_address_manifest,
                             mapping_snapshot, source_fingerprint, source_paths, report_rom_path, report_source,
-                            verify_dependencies, carry_volatile_records, carry_trace_records)
+                            verify_dependencies, carry_volatile_records, carry_trace_records,
+                            valid_match_verdict)
 
 try:
     from capstone import (Cs, CS_ARCH_ARM, CS_MODE_ARM, CS_MODE_THUMB,
@@ -637,6 +639,29 @@ def allowlisted_volatile_check(root, address, args):
     return records, None, source
 
 
+def carry_standing_premise(root, report, address, args, status, emitted):
+    """Add the standing frame premise line (standing_premise) to the MATCH report a selector wrote.
+
+    Every selector writes its own report, and none writes the line itself, so it is added here,
+    for every selector at once.  If the report cannot carry it, the report and any emitted bytes
+    are removed and no MATCH verdict stands.
+    """
+    if args.no_write or status != 0 or not report.exists():
+        return                 # nothing written: no report to carry the line
+    try:
+        text = report.read_bytes().decode("utf-8")
+        if not valid_match_verdict(text):
+            raise ValueError("the selector wrote no canonical MATCH report")
+        carried = standing_premise.carry(text, root, address)
+        if carried != text:
+            report.write_bytes(carried.encode("utf-8"))
+    except (OSError, ValueError, UnicodeError) as error:
+        report.unlink(missing_ok=True)
+        if emitted is not None:
+            emitted.unlink(missing_ok=True)
+        sys.exit(f"standing frame premise not carried: {error}")
+
+
 def issue_with_volatile_records(issue, root, address, args, records, source, traces=()):
     """run a selector's own report writer and carry the volatile and inert test trace records into its report.
 
@@ -645,6 +670,8 @@ def issue_with_volatile_records(issue, root, address, args, records, source, tra
     `traces` (inert_trace_records, carry_trace_records) and the source is
     unchanged since the check; if any of that fails, the report and any
     emitted bytes it just wrote are removed and no MATCH verdict is printed.
+    The standing frame premise line goes on last (carry_standing_premise), on
+    every route, so report_matches checks and removes it first.
     """
     root = Path(root)
     report = root / "docs" / "match" / f"{address:08X}.md"
@@ -667,6 +694,7 @@ def issue_with_volatile_records(issue, root, address, args, records, source, tra
                     emitted.unlink(missing_ok=True)
             sys.exit("allowlisted volatile check is stale: source or headers changed during "
                      "verification; re-run match.py")
+        carry_standing_premise(root, report, address, args, status, emitted)
         return status
     if args.label:
         sys.exit("allowlisted volatile records need the unlabelled report" if records else
@@ -702,6 +730,7 @@ def issue_with_volatile_records(issue, root, address, args, records, source, tra
             sys.stdout.write(captured.getvalue())
         sys.exit(f"allowlisted volatile records not carried: {error}" if records else
                  f"inert test trace records not carried: {error}")
+    carry_standing_premise(root, report, address, args, status, emitted)
     lines = [f"volatile{record.removeprefix('* allowlisted volatile').removeprefix(':')}"
              for record in records] + [traced_line(record) for record in traces]
     print("\n".join(output[:verdicts[0]] + lines + output[verdicts[0]:]))
@@ -8155,6 +8184,13 @@ def main():
             dma_lines=dma_fills.report_lines() if dma_fills is not None else (),
             scratch_lines=return_scratch.report_lines() if return_scratch is not None else (),
             far_jumps=far_jump.record(verified_instructions, addr))
+        if exact:
+            # The standing frame premise, on every MATCH of a function that holds a frame word
+            # (standing_premise); --check-report compares the report with it.
+            try:
+                report_text = standing_premise.carry(report_text, ROOT, addr)
+            except (OSError, ValueError) as error:
+                sys.exit(f"standing frame premise not carried: {error}")
         if args.check_report:
             # what status.py --verify requires of a MATCH: the saved report is exactly the one this run
             # would write (a source that does not match keeps its verdict and compares nothing)

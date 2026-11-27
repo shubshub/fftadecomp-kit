@@ -1288,7 +1288,7 @@ class ReportTests(unittest.TestCase):
                         directory, BASE, body, thunks.SCHEMAS[selector], instructions, mapped=True,
                         control_flow=control_flow, data_profile=True, switches=True, switch_evidence=manifest,
                         thunk_switch_selector=selector)
-                    self.assertEqual(rebuild.saved_profile_arguments(complete, directory, BASE),
+                    self.assertEqual(rebuild.saved_profile_arguments(report_fixtures.carried(complete, directory, BASE), directory, BASE),
                                      ['--switch-data-profile', selector])
                     with self.assertRaisesRegex(ValueError, 'invalid saved profile report'):
                         rebuild.saved_profile_arguments('\n'.join(good), directory, BASE)

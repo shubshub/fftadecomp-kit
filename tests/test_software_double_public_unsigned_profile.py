@@ -1,6 +1,7 @@
 """Canonical public wide conversion and the exact authored runtime owner."""
 
 import copy
+import report_fixtures
 from contextlib import redirect_stdout
 import hashlib
 import io
@@ -44,7 +45,7 @@ class PublicUnsignedConversionTests(unittest.TestCase):
         report = self.native_report()
         opening, reading = self.patched_rom()
         with opening, reading:
-            self.assertTrue(profile.report_matches(report, self.root, BASE))
+            self.assertTrue(profile.report_matches(report_fixtures.uncarried(report), self.root, BASE))
             (self.root / "src/08000000.c").write_text(SOURCE.replace("return (unsigned long long)value;", "return 0;"))
             self.assertFalse(profile.report_matches(report, self.root, BASE))
 
@@ -91,7 +92,7 @@ class PublicUnsignedConversionTests(unittest.TestCase):
         with patch.object(sys, "argv", argv), patch.object(match, "ROOT", match.ROOT), redirect_stdout(io.StringIO()):
             self.assertEqual(match.main(), 0)
         report = (self.root / "docs/match/08142864.md").read_text()
-        self.assertTrue(profile.report_matches(report, self.root, start))
+        self.assertTrue(profile.report_matches(report_fixtures.uncarried(report), self.root, start))
         self.assertIn(f"{end-start}/{end-start} bytes", report)
         self.assertFalse(profile.report_matches(report.replace("__gedf2", "__ltdf2"), self.root, start))
         runner = match.Runner(match.DEFAULT_CC, root=self.root, timeout=120)

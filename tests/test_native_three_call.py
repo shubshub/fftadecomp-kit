@@ -14,6 +14,7 @@ HERE = Path(__file__).resolve()
 sys.path.insert(0, str(HERE.parents[1]/'tools'))
 sys.dont_write_bytecode = True
 import match
+import report_fixtures
 import owner_admission_profile as owner
 import owner_graph_profile as graph
 import local_long_branch_profile as frame
@@ -286,7 +287,7 @@ class LifecycleTests(unittest.TestCase):
             directory=root/'docs/match';directory.mkdir(parents=True)
             (directory/f'{A:08X}.md').write_text(report)
             with patch.object(owner,'report_matches',return_value=True) as replay:
-                self.assertTrue(evidence.report_matches(report,root,A));replay.assert_called_once()
+                self.assertTrue(evidence.report_matches(report_fixtures.carried(report, root, A), root, A));replay.assert_called_once()
             completed=argparse.Namespace(returncode=0,stdout=f'extent    {len(proof.body)} bytes\nverdict MATCH - byte identical\n')
             with patch.object(status,'report_matches',return_value=True),patch.object(status.subprocess,'run',return_value=completed) as command:
                 values=status.collect(str(root),True,quiet=True,jobs=1)

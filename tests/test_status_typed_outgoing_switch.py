@@ -75,7 +75,7 @@ class StatusTypedOutgoingSwitchTests(unittest.TestCase):
 
     def test_rebuild_forwards_the_exact_selector(self):
         import rebuild
-        self.assertEqual(rebuild.saved_profile_arguments(self.original, self.root, BASE),
+        self.assertEqual(rebuild.saved_profile_arguments(report_fixtures.carried(self.original, self.root, BASE), self.root, BASE),
                          ['--switch-data-profile', frame.SELECTOR])
         with self.assertRaisesRegex(ValueError, 'invalid saved profile report'):
             rebuild.saved_profile_arguments(self.original.replace('* relocations: none', '* relocations: some'),

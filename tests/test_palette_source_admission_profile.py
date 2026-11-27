@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 sys.path[:0] = [str(Path(__file__).resolve().parents[1]/'tools')]
 import match
+import report_fixtures
 import match_evidence as evidence
 import palette_source_admission_profile as admission
 import palette_certificate_authority as authority
@@ -248,7 +249,7 @@ class PaletteSourceTests(unittest.TestCase):
             result=self.compile(root);report=admission.render(result)
             (root/'bundle.json').unlink()
             with patch.object(admission,'build',return_value=result) as replay:
-                self.assertTrue(evidence.report_matches(report,root,A))
+                self.assertTrue(evidence.report_matches(report_fixtures.carried(report, root, A), root, A))
                 self.assertEqual(replay.call_args.kwargs['expected'],result['manifest'])
             self.assertEqual(admission.bundle_for(root,A,self.args(),result['manifest']),self.bundle)
 

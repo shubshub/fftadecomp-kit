@@ -17,6 +17,7 @@ sys.path[:0] = [str(Path(__file__).resolve().parent),
                str(Path(__file__).resolve().parents[1] / 'tools')]
 from test_static_callback_r6_target import fixture, A, W, C, CASE, bl
 import match
+import report_fixtures
 import match_evidence
 import owner_admission_profile as owner
 import static_callback_r6_frame_profile as policy
@@ -180,9 +181,10 @@ class AlignmentTests(unittest.TestCase):
         result = (self.values['data'], manifest, 'synthetic source', self.values['mapping'],
             self.values['index'], self.values['objects'], self.values['rom'], len(instructions), self.original)
         report = owner.render(A, result)
+        report_fixtures.rom_image(self, self.values['rom'])
         self.assertEqual(owner.selector_for_report(report), policy.ALIGNED_TARGET_SELECTOR)
         with patch.object(owner, 'build', return_value=result) as build:
-            self.assertTrue(match_evidence.report_matches(report, self.root, A))
+            self.assertTrue(match_evidence.report_matches(report_fixtures.carried(report, self.root, A), self.root, A))
         self.assertEqual(build.call_args.kwargs['selector'], policy.ALIGNED_TARGET_SELECTOR)
         for schema in (policy.SCHEMA, policy.TARGET_SCHEMA):
             with self.subTest(schema=schema), self.assertRaises(ValueError):

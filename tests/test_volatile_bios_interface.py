@@ -13,6 +13,7 @@ import volatile_semantics as semantics
 import bios_cpuset_fill_profile as bios
 import match
 import match_evidence
+import report_fixtures
 
 
 class BiosVolatileInterfaceTests(unittest.TestCase):
@@ -118,8 +119,10 @@ class BiosVolatileInterfaceTests(unittest.TestCase):
         self.assertNotEqual(base, bios_report)
         uses = '* allowlisted volatile: fixture'
         semantic = '* allowlisted volatile semantics: fixture'
+        report_fixtures.rom_holding(self, b'\x70\x47', native.A)
         for report, selected in ((base, False), (bios_report, True)):
-            carried = match_evidence.carry_volatile_records(report, [uses, semantic])
+            carried = report_fixtures.carried(
+                match_evidence.carry_volatile_records(report, [uses, semantic]), '.', native.A)
             with patch.object(match.plausibility, 'allowlisted_volatile_uses', return_value=[uses]), \
                     patch.object(match, 'allowlisted_volatile_semantics', return_value=[semantic]) as replay, \
                     patch.object(native.owner, 'report_matches', return_value=False) as owner_check:

@@ -1,5 +1,6 @@
 """Canonical binary64 + the existing exact guarded local word-table encoding."""
 import copy
+import report_fixtures
 import io
 from contextlib import redirect_stdout
 import json
@@ -82,7 +83,7 @@ class SoftwareDoubleSwitchTests(unittest.TestCase):
         report=(self.root/'docs/match/08000000.md').read_text()
         opening,reading=self.patched_rom()
         with opening,reading:
-            self.assertTrue(profile.report_matches(report,self.root,BASE))
+            self.assertTrue(profile.report_matches(report_fixtures.uncarried(report),self.root,BASE))
             path=self.root/'src/08000000.c';path.write_text(SOURCE.replace('7.0','8.0'))
             self.assertFalse(profile.report_matches(report,self.root,BASE))
 
@@ -122,7 +123,7 @@ class SoftwareDoubleSwitchTests(unittest.TestCase):
             self.assertEqual(match.main(),0)
         report=(self.root/'docs/match/08000000.md').read_text()
         opening,reading=self.patched_rom()
-        with opening,reading:self.assertTrue(profile.report_matches(report,self.root,BASE))
+        with opening,reading:self.assertTrue(profile.report_matches(report_fixtures.uncarried(report),self.root,BASE))
 
     def test_manifest_requires_exact_guard_bounds_and_unique_integer_local_words(self):
         self.fixture()

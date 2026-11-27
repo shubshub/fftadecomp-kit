@@ -26,14 +26,66 @@ def complete(root, address, body, schema, instructions, *, thumb=True, source=No
     """
     body = bytes(body)
     listing, _, _ = match.report_listing(instructions, body, address, len(body), thumb)
-    return match.render_report(
+    return carried(match.render_report(
         addr=address, src_rel=source or evidence.report_source(root, address), schema=schema,
         fingerprint=evidence.source_fingerprint(root, address),
         compiler=compiler or f"{match.DEFAULT_CC} {match.DEFAULT_FLAGS}", want=body, span=len(body),
         got_body=body, verdict="MATCH - byte identical", same_bytes=len(body), listing=listing,
         framed_profile=thumb and match.uses_stack_frame(instructions),
         mapping=evidence.mapping_snapshot(root) if mapping is None else mapping,
-        data_mapping=evidence.data_snapshot(root) if data_mapping is None else data_mapping, **parts)
+        data_mapping=evidence.data_snapshot(root) if data_mapping is None else data_mapping, **parts),
+        root, address)
+
+
+def rom_image(test, image):
+    """For the rest of `test`: match_evidence.report_rom_path names a file holding `image`, the ROM
+    the standing frame premise check compares a fixture report's ROM bytes with, for a fixture that
+    replays a report under a root with no ROM of its own (its schema replay mocked or fed the image)."""
+    import os
+    import tempfile
+    scratch = Path(os.environ.get("FFTA_TEST_SCRATCH", Path(__file__).resolve().parents[1] / "build"))
+    scratch.mkdir(parents=True, exist_ok=True)
+    directory = tempfile.TemporaryDirectory(prefix="premise_rom_", dir=scratch)
+    test.addCleanup(directory.cleanup)
+    rom = Path(directory.name) / "fixture.bin"
+    rom.write_bytes(bytes(image))
+    patcher = mock.patch.object(evidence, "report_rom_path", return_value=str(rom))
+    patcher.start()
+    test.addCleanup(patcher.stop)
+    return rom
+
+
+def rom_holding(test, data, address):
+    """rom_image of a ROM holding `data` at `address` and zeros before it."""
+    return rom_image(test, bytes(address - match.ROM_BASE) + bytes(data))
+
+
+def premise_line_checked_elsewhere():
+    """A patch under which report_matches passes a report to its schema replay without the standing
+    frame premise check, for a synthetic report with no ROM bytes line whose schema replay is itself
+    mocked (the check is test_standing_premise's)."""
+    import standing_premise
+    return mock.patch.object(standing_premise, "strip", side_effect=lambda report, root, address: report)
+
+
+def uncarried(report):
+    """`report` without the standing frame premise line, as a profile's own replay reads it
+    (match_evidence.report_matches removes the line before it calls one)."""
+    import standing_premise
+    return standing_premise.without(report)
+
+
+def carried(report, root, address):
+    """`report` as match.py writes it: with the standing frame premise line when the function holds a frame.
+
+    A fixture whose ROM does not hold its body (one whose replay must refuse on the bytes) cannot carry
+    the line; it is returned as rendered, and its replay still refuses.
+    """
+    import standing_premise
+    try:
+        return standing_premise.carry(report, root, address)
+    except (OSError, ValueError):
+        return report
 
 
 def legacy_report(root, address, body, schema, *, thumb=True, self_sites=frozenset(), **parts):

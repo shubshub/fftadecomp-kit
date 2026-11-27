@@ -11,6 +11,7 @@ import unittest
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 import match
+import report_fixtures
 import match_evidence
 import owner_admission_profile as owner
 import bios_word_switch_buffer_profile as profile
@@ -97,7 +98,7 @@ class BiosWordSwitchNativeTests(unittest.TestCase):
             result=owner.build(root,A,selector=profile.SELECTOR)
             self.assertEqual(result[8],original)
             report=owner.render(A,result);(root/'compiler/report.md').write_text(report)
-            self.assertTrue(match_evidence.report_matches(report,root,A))
+            self.assertTrue(match_evidence.report_matches(report_fixtures.carried(report, root, A), root, A))
             run=subprocess.run([sys.executable,str(Path(match.__file__)),'--root',str(root),f'0x{A:08X}',
                 '--owner-runtime-profile',profile.SELECTOR],text=True,capture_output=True)
             (root/'compiler/cli.log').write_text(run.stdout+run.stderr)

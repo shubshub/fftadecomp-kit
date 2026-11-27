@@ -11,6 +11,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 import match
+import report_fixtures
 import match_evidence
 import owner_admission_profile as owner
 import descriptor_single_store_profile as profile
@@ -94,7 +95,7 @@ class NativeTests(unittest.TestCase):
         self.assertTrue(all(row['writeback']==row['offset']+4 for row in stores))
         self.assertEqual({tuple(row['stored_value']) for row in stores},{('constant',7)})
         self.assertIn(C,{row['address'] for row in buffers['native_frame_replays']})
-        self.assertTrue(match_evidence.report_matches(self.report,self.root,A))
+        self.assertTrue(match_evidence.report_matches(report_fixtures.carried(self.report, self.root, A), self.root, A))
 
     def test_previous_selector_retains_store_refusal(self):
         with self.assertRaisesRegex(ValueError,'append block-write'):

@@ -239,6 +239,9 @@ def saved_selectors(report):
     import signed_divmod_profile
     import unsigned_divmod_profile
     from match import DEFAULT_FLAGS
+    import standing_premise
+    # Only parses: the standing frame premise line is checked where the report is replayed.
+    report = standing_premise.without(report)
     lines = report.splitlines()
     found = types.SimpleNamespace()
     found.unsigned_runtime = unsigned_divmod_profile.selector_for_report(report)
@@ -1604,7 +1607,11 @@ def issued_report_pins(report, root, address):
     records the report carries are the ones match.py just computed; it does
     not ask whether this address may carry that schema at all.
     """
+    import standing_premise
     try:
+        # The comparison already bound the standing frame premise line to this compile; the pins
+        # read the report as its writer rendered it.
+        report = standing_premise.without(report)
         return address_pins(report, root, address, volatile_record_lines(report))
     except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError,
             RuntimeError, subprocess.SubprocessError):
@@ -1612,6 +1619,24 @@ def issued_report_pins(report, root, address):
 
 
 def report_matches(report, root, address):
+    """Whether `report` is a current MATCH report for `address` under `root`.
+
+    The standing frame premise line is checked and removed first (standing_premise.strip): it
+    must be there exactly when the verified function holds a frame word, so every schema replay
+    below sees the text its writer rendered.
+    """
+    if not valid_match_verdict(report):
+        return False
+    import standing_premise
+    try:
+        report = standing_premise.strip(report, root, address)
+    except (OSError, ValueError, UnicodeError):
+        return False
+    return _report_matches(report, root, address)
+
+
+def _report_matches(report, root, address):
+    """report_matches for a report whose standing frame premise line is already checked and removed."""
     if not valid_match_verdict(report):
         return False
     import signed_remainder_leaf_profile as remainder_leaf
@@ -1621,7 +1646,7 @@ def report_matches(report, root, address):
         if not remainder_leaf.replayable(report):
             return False
         with remainder_leaf.activated():
-            return report_matches(report, root, address)
+            return _report_matches(report, root, address)
     import library_units
     if not library_units.report_admitted(report, root, address):
         # a unit report must bind its current row and compiler; any other

@@ -77,6 +77,7 @@ SUCCESSOR_SITES = {
     "callee_saved_watch.py:inline": OWN_RULE,
     "callee_saved_watch.py:one_walk": OWN_RULE,
     "owner_graph_profile.py:graph": OWN_RULE,
+    "standing_premise.py:holds_frame": OWN_RULE,  # in-span BL on both edges: a byte scan whose reach covers the walked CFG
     "volatile_rom_proof.py:pool_halfword": OWN_RULE,
     # REFUSES
     # a `bl` into the span (a far jump) refuses the fresh-block premise

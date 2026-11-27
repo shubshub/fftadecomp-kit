@@ -13,6 +13,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode=True
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 import match
+import report_fixtures
 import match_evidence
 import owner_admission_profile as owner
 import descriptor_callee_constant_profile as profile
@@ -117,7 +118,7 @@ class NativeTests(unittest.TestCase):
         cls.temporary=tempfile.TemporaryDirectory(prefix='descriptor_constants_',dir=scratch)
         cls.root=Path(cls.temporary.name);cls.data,cls.bindings,cls.original=fixture(cls.root)
         cls.environment=patch.dict(os.environ,FFTA_ROM=str(cls.root/'baserom.bin'));cls.environment.start()
-        cls.result=owner.build(cls.root,A,selector=profile.SELECTOR);cls.report=owner.render(A,cls.result)
+        cls.result=owner.build(cls.root,A,selector=profile.SELECTOR);cls.report=report_fixtures.carried(owner.render(A,cls.result),cls.root,A)
 
     @classmethod
     def tearDownClass(cls):cls.environment.stop();cls.temporary.cleanup()
@@ -136,7 +137,7 @@ class NativeTests(unittest.TestCase):
             f'{A:08X}','--owner-runtime-profile',profile.SELECTOR],capture_output=True,text=True)
         self.assertEqual(native.returncode,0,native.stdout+native.stderr)
         saved=(self.root/f'docs/match/{A:08X}.md').read_text()
-        self.assertEqual(saved,self.report);self.assertTrue(match_evidence.report_matches(saved,self.root,A))
+        self.assertEqual(saved,self.report);self.assertTrue(match_evidence.report_matches(report_fixtures.carried(saved, self.root, A), self.root, A))
         import status
         totals=status.collect(str(self.root),True,quiet=True)
         self.assertEqual((totals[1],totals[3],totals[4]),(1,len(self.data),[]))
