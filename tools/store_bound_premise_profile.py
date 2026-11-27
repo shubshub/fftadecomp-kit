@@ -33,15 +33,17 @@ run again with a `StoreBounds` attached (`proof.store_bounds`), in two passes:
    ends there, before the store, and its replay state is counted as pruned.  Every execution up to the bound is the
    ordinary replayed store with all its checks.  Each row must prune at least one path.
 
-A row states a count, never reachability ("this store, or this call, never runs").  So a bound below 1
-is refused, in the file and when the frame allows none at a site's first execution (with no entry
-printed).  And in the prune pass each replayed walk of a row callee keeps its state graph
-(`CallBounds`): the walk is refused when no path of the call returns and some end at a bound, or when,
-from a state in which a row store runs for the first time on its path, no continuation returns and
-some end at a bound.  The replay follows both ways of every branch its known values leave open, so the
-code itself then runs a row store past its bound whenever that store runs, and the row would assert
-that the state never occurs.  A bound reached only after a later execution stays a count (the code
-allows fewer executions) and is admitted.
+A row states a count, never reachability ("this store, or this call, never runs").  So a row with a
+bound below 1 is malformed, and a frame that allows no execution at a site's first execution raises
+the trigger unchanged.  And each replayed walk of a row callee keeps its state graph (`CallBounds`):
+the walk is refused when no path of the call returns and some end at a bound, or when, from a state
+in which a row store runs for the first time on its path, no continuation returns and some end at that
+store's bound.  The replay follows both ways of every branch its known values leave open, so the code itself
+then runs a row store past its bound whenever that store runs, and the row would assert that the state
+never occurs.  In the measure pass, where paths end at the refusing stores, either finding raises the
+trigger unchanged: no entry the frame allows could pass (a prune pass ends each path no later), so none
+is printed.  In the prune pass it refuses the reviewed entry.  A bound reached only after a later
+execution stays a count (the code allows fewer executions) and is admitted.
 
 A missing or differing entry refuses and prints the entry to review, with the largest bounds the
 frame allows; the reviewer proves each bound from the ROM (or a smaller one) and shows it before it
@@ -221,15 +223,16 @@ class StoreBounds:
 
 
 class CallBounds:
-    """One replayed walk of a row callee.  On the prune pass it keeps the walk's state graph, whose
-    nodes are the replay's (address, state) pairs, so that ``finish`` can refuse a walk that verifies
-    the premise instead of the call:
+    """One replayed walk of a row callee.  It keeps the walk's state graph, whose nodes are the replay's
+    (address, state) pairs, so that ``finish`` can refuse a walk that verifies the premise instead of
+    the call (a path "ends at a bound" where the prune pass cuts it, or where the measure pass ends it at
+    a refusing row store):
 
     * no path of the call returns, and some end at a bound; or
     * the code itself runs a row store past its bound: from a state in which a row store runs for the
-      first time on its path, no replayed continuation returns and some end at a bound.  The row would
-      then assert that the state never occurs, which is a reachability premise (as a bound of 0 would
-      be), not a count.
+      first time on its path, no replayed continuation returns and some end at that store's bound.  The
+      row would then assert that the state never occurs, which is a reachability premise (as a bound of 0
+      would be), not a count.  (Continuations cut only at another row's bound are that row's count.)
 
     The replay explores both ways of every branch its known values leave open, so "no continuation
     returns" holds for every input: the overrun is forced by the code, not by the unknown values.
@@ -237,7 +240,6 @@ class CallBounds:
 
     def __init__(self, bounds, callee, call_site):
         self.bounds, self.callee, self.call_site = bounds, callee, call_site
-        self.record = not bounds.measure
         self.successors = {}
         self.returns = set()
         self.prunes = set()
@@ -247,23 +249,20 @@ class CallBounds:
         """``StoreBounds.step`` at ``node``."""
         first = instruction.address not in counts
         if not self.bounds.step(proof, self.callee, self.call_site, instruction, aliases, stack, counts, bound):
-            if self.record:
-                self.prunes.add(node)
+            self.prunes.add(node)
             return False
-        if self.record and first:
+        if first:
             self.first[node] = instruction.address
         return True
 
     def edge(self, node, successor):
-        if self.record:
-            self.successors.setdefault(node, []).append(successor)
+        self.successors.setdefault(node, []).append(successor)
 
     def returned(self, node):
-        if self.record:
-            self.returns.add(node)
+        self.returns.add(node)
 
     def finish(self):
-        if not self.record or not self.prunes:
+        if not self.prunes:
             return
         where = f'0x{self.callee:08X} (called at 0x{self.call_site:08X})'
         if not self.returns:
@@ -282,12 +281,18 @@ class CallBounds:
                         seen.add(node)
                         work.append(node)
             return seen
-        completes, overruns = reaching(self.returns), reaching(self.prunes)
-        forced = [site for node, site in self.first.items() if node in overruns and node not in completes]
+        completes = reaching(self.returns)
+        forced = []
+        for site in sorted({node[0] for node in self.prunes}):
+            # A path cut at another row's bound is that row's count, not this store's.
+            overruns = reaching({node for node in self.prunes if node[0] == site})
+            if any(node in overruns and node not in completes
+                   for node, first in self.first.items() if first == site):
+                forced.append(site)
         if forced:
-            stores = ', '.join(f'0x{site:08X}' for site in sorted(set(forced)))
+            stores = ', '.join(f'0x{site:08X}' for site in forced)
             raise ValueError(f'store bound: in {where}, once the store at {stores} first runs no replayed '
-                             f'continuation returns and some end at a bound: the code itself runs a row store '
+                             f'continuation returns and some end at its bound: the code itself runs the store '
                              f'more often than its row allows')
 
 
@@ -328,12 +333,9 @@ def retry(error, make_proof, run, data, address, index_premises, premises):
     frame = dict(sorted(measured.store_bounds.refusing.items()))
     if trigger not in frame:
         raise error
-    first = sorted(key for key, bound in frame.items() if bound < 1)
-    if first:
-        callee, site = first[0]
-        raise ValueError(f'{error}; default store-bound retry: store bound: the store at 0x{site:08X} in '
-                         f'0x{callee:08X} leaves the allocated local words at its first execution on a replayed '
-                         f'path; a bound below 1 is not admitted')
+    if any(bound < 1 for bound in frame.values()):
+        # A store that leaves the frame at its first execution: only "it never runs" would admit it.
+        raise error
     suggested = {key: min(reviewed.get(key, bound), bound) for key, bound in frame.items()}
     differs = None
     if entry is None:

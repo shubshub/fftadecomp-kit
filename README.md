@@ -4098,18 +4098,23 @@ store at `site` executes at most `bound` times. The retry runs in two passes:
   store, with all its checks. Stores at every other site keep their checks.
 
 A row bounds how often a store runs; it may not say that a store or a call
-never runs, because that is a reachability premise and not a count. So the
-retry refuses, with the offending store or call named:
-* a store at a row site that leaves the allocated words at its first
-  execution (a bound below 1 is refused, in the file and in the walk);
+never runs, because that is a reachability premise and not a count. So:
+* a row with a bound below 1 is malformed;
 * a replayed call of a row callee in which no path returns and some end at a
-  bound: the walk would verify the premise, not the call;
-* a replayed call in which, from a state where a row store runs for the first
-  time on its path, no continuation returns and some end at a bound. The
-  replay follows both ways of every branch its known values leave open, so
-  then the code itself runs a row store more often than its row allows once
-  that store runs. A bound reached only after a later execution is still a
-  count (the code allows fewer executions) and is admitted.
+  bound is refused: the walk would verify the premise, not the call;
+* so is a replayed call in which, from a state where a row store runs for the
+  first time on its path, no continuation returns and some end at that
+  store's bound (paths cut only at another row's bound are that row's count).
+  The replay follows both ways of every branch its known values leave open,
+  so the code itself then runs a row store more often than its row allows
+  once that store runs. A bound reached only after a later execution is still
+  a count (the code allows fewer executions) and is admitted.
+
+The measure pass applies the same two checks to the paths it ends at
+refusing stores. There, as for a store that leaves the allocated words at its
+first execution, no entry the frame allows could pass, so the trigger is
+raised unchanged and no entry is printed. In the prune pass they refuse the
+reviewed entry, naming the call or the stores.
 
 A missing or differing entry refuses and prints the entry to review, with the
 largest bounds the frame allows. Each bound is a STORE premise. It ships only
