@@ -33,9 +33,17 @@ holds:
 3. ROM.  The addressed function compiled as written (R) equals the ROM at every byte the linker does not fill
    in, and the ROM's func_0814186C is `swi 0x0B; bx lr` and its func_08141868 `swi 0x0C; bx lr` wherever a fill
    calls them.  No other function of the unit holds a volatile reference.
-4. Necessity.  For each group the unit compiled with the group's tokens removed has other code, keeps only
-   volatile frame stores R makes, and has that many fewer (its markers' reaches); the groups account for every
-   volatile frame store in R.
+4. Necessity.  For each group the unit compiled with the group's tokens removed (the variant) has other code,
+   and its BIOS calls pair with R's by call order (bios_calls, paired_removal): the variant makes the same calls
+   of func_0814186C and func_08141868 in the same order (the expand RTL's, which no pass has reordered yet), each
+   with the same control word and destination as the resolver reads them, and with a frame slot as its source
+   exactly where R's call has one, except that any of R's fills may instead take the address of a local not yet
+   placed in the frame (without its qualifier gcc keeps a word temporary in a pseudo while only its address is
+   taken, `addressof`); such a fill has no store there.  Each of R's fills either has no volatile store to its
+   source in its block in the variant, or exactly one of its width there, at any offset (removing a qualifier may
+   move another temporary); no other call has one, and no volatile frame store of the variant lies outside a fill.
+   The fills that lost theirs are as many as the group's markers reach, and the groups' fills are disjoint and are
+   all of R's fills.
 5. Each fill in R's expand RTL (fills): a call of func_0814186C or func_08141868 whose r0 is a frame slot and
    whose r2 is a constant with bit 24 (one source unit) set, and whose block holds one volatile store of the
    temporary's width to that slot.  For CpuSet bit 26 (32-bit units) is set exactly for a word temporary; for
@@ -1253,6 +1261,11 @@ def prove(tree, project, relpath, raw, admitted, rom=None, dependencies=None):
         keys = [store_key(touch) for touch in volatile_frame_stores(rtl[name], proof.Resolver(rtl[name]))]
         if len(keys) != len(found):
             raise ProofError("the fills do not account for every volatile frame store")
+        # R's fills among its BIOS calls (fills() made a fill of each call with one volatile store to its source,
+        # and refuses a volatile store that is no fill's)
+        calls = bios_calls(rtl[name], proof.Resolver(rtl[name]))
+        uids = [call["call"].uid for call in calls]
+        mine = {uids.index(fill["call"].uid): k for k, fill in enumerate(found)}
         owned, variants = [], []
         for g in groups:
             indices = {offsets.index(o) for o in g["offsets"]}
@@ -1260,18 +1273,19 @@ def prove(tree, project, relpath, raw, admitted, rom=None, dependencies=None):
             if digest(stripped) == digest(real):
                 raise ProofError(f"removing the qualifiers of the fill at line {g['line']} does not change the code")
             plain = stripped["dumps"]["rtl"][name]
-            left = Counter(store_key(touch) for touch in volatile_frame_stores(plain, proof.Resolver(plain)))
+            resolver = proof.Resolver(plain)
             reaches = {unit.reaches[k] for k in indices}
             if len(reaches) != 1:
                 raise ProofError(f"the fill at line {g['line']} does not account for its volatile stores")
-            owned.append(account(keys, left, reaches.pop(), g["line"]))
+            owned.append(paired_removal(calls, bios_calls(plain, resolver), set(mine),
+                                        [touch[0] for touch in volatile_frame_stores(plain, resolver)],
+                                        reaches.pop(), g["line"]))
             variants.append(digest(stripped))
-        if sum(owned, Counter()) != Counter(keys):
+        claimed = Counter(k for lost in owned for k in lost)
+        if set(claimed) != set(mine) or any(count > 1 for count in claimed.values()):
             raise ProofError("the fills do not account for every volatile frame store")
-        # for the record: each group takes, slot by slot, the next fills its removal took away
-        pending = {key: [k for k, other in enumerate(keys) if other == key] for key in keys}
-        owned = [sorted(pending[key].pop(0) for key, count in removed.items() for _ in range(count))
-                 for removed in owned]
+        # for the record: each group's fills, as indices into found
+        owned = [sorted(mine[k] for k in lost) for lost in owned]
     verdicts = []
     for g, removed, variant in zip(groups, owned, variants):
         where = f"macro {g['name']}, used {len(removed)} times" if g["kind"] == "macro" else "a block"
@@ -1308,13 +1322,94 @@ def carrier(project, rom, address, dependencies=None):
     return Carrier(rom, entries, address)
 
 
-def account(keys, left, reach, line):
-    """the volatile frame stores that removing a group's tokens takes away: the variant keeps only stores R makes,
-    and loses as many as the tokens reach the unit"""
-    removed = Counter(keys) - left
-    if left - Counter(keys) or sum(removed.values()) != reach:
-        raise ProofError(f"the fill at line {line} does not account for its volatile stores")
-    return removed
+def bios_calls(function, resolver):
+    """[call] of every call of a BIOS fill's callee in an expand-level function, in program order: {call (insn),
+    callee, control (the constant r2 is set to, or None), destination (r1 as the resolver reads it: (kind, base,
+    offset), a frame address with its constant offset), slot (r0's frame register and offset, or None), addressed
+    (whether r0 is instead the address of a local not yet placed in the frame: addressed_local), stores (the insn
+    indices of the volatile stores of its block to that slot, with their store keys)}"""
+    stores = [touch for touch in volatile_frame_stores(function, resolver) if touch[2] is not None]
+    found = []
+    for insn in function.insns:
+        if insn.code != "call_insn":
+            continue
+        names = [name for name in CALLEES if f'"{name}"' in proof.flatten(insn.pattern)]
+        if not names:
+            continue
+        values = []
+        for number in (2, 1):
+            passed = argument(function, insn, number)
+            base, offset = resolver.resolve(passed, insn.index) if passed is not None else (None, None)
+            if base is not None and base.kind == "frame":
+                offset = frame_offset(function, passed, at=insn.index)
+            values.append((base.kind, base.value, offset) if base is not None else None)
+        control = values[0][1] & 0xFFFFFFFF if values[0] and values[0][0] == "int" and values[0][1] is not None \
+            else None
+        source = argument(function, insn, 0)
+        slot = frame_offset(function, source, at=insn.index) if source is not None else None
+        start = block_start(function, insn.index)
+        found.append(dict(call=insn, callee=names[0], control=control, destination=values[1], slot=slot,
+                          addressed=addressed_local(function, source),
+                          stores=[(touch[0], store_key(touch)) for touch in stores
+                                  if slot is not None and start <= touch[0] < insn.index and
+                                  (touch[1], touch[2]) == slot]))
+    return found
+
+
+def addressed_local(function, x, depth=0):
+    """whether x is, through single-definition pseudos, the address of a local the expand pass has not placed in
+    the frame yet, `(addressof ...)`: gcc keeps a scalar that fits a register in a pseudo while only its address
+    is taken, and puts it on the stack later, so without its qualifier a word fill's temporary has no frame slot
+    in the expand RTL"""
+    if x is None or depth > 32:
+        return False
+    if code(x) == "addressof":
+        return True
+    if code(x) == "reg" and int(x[1]) >= proof.FIRST_PSEUDO:
+        definitions = function.defs.get(int(x[1]), [])
+        return len(definitions) == 1 and addressed_local(function, definitions[0][1], depth + 1)
+    return False
+
+
+def paired_removal(real, plain, fills, stores, reach, line):
+    """the indices into real of the fills whose volatile store removing a group's tokens takes away.  real and
+    plain are bios_calls() of R and of the variant without the group's qualifiers, paired by call order; fills
+    holds the indices of R's fills, stores the insn indices of every volatile frame store of the variant.
+    ProofError unless the pairing is unambiguous (the same BIOS calls in the same order, with the same controls
+    and destinations, and a frame slot as the source of the same calls, except that any of R's fills may take the
+    address of a local not yet placed in the frame, which then has no store), each of R's fills has in the variant
+    none or exactly one volatile store of its width to its source (at any offset), no other call has one, every
+    volatile frame store of the variant is a fill's, and the fills that lost theirs are as many as the tokens
+    reach the unit"""
+    def refuse(reason):
+        return ProofError(f"the fill at line {line} does not account for its volatile stores: {reason}")
+    if len(plain) != len(real):
+        raise refuse(f"without its qualifiers the unit makes {len(plain)} BIOS calls, not {len(real)}")
+    for k, (one, other) in enumerate(zip(real, plain)):
+        for what in ("callee", "control", "destination"):
+            if one[what] != other[what]:
+                raise refuse(f"BIOS call {k + 1} has another {what} without them")
+        if k in fills and other["slot"] is None and not other["addressed"]:
+            raise refuse(f"BIOS call {k + 1}, a fill, has no local as its source without them")
+        if k not in fills and (one["slot"] is None) != (other["slot"] is None):
+            raise refuse(f"BIOS call {k + 1} has {'no' if other['slot'] is None else 'a'} frame slot as its source "
+                         "without them")
+    lost, kept = set(), set()
+    for k, (one, other) in enumerate(zip(real, plain)):
+        if k not in fills:
+            if other["stores"]:
+                raise refuse(f"BIOS call {k + 1}, no fill, has a volatile store to its source without them")
+        elif not other["stores"]:
+            lost.add(k)
+        elif len(other["stores"]) != 1 or other["stores"][0][1][2] != one["stores"][0][1][2]:
+            raise refuse(f"the fill of BIOS call {k + 1} keeps other volatile stores to its source without them")
+        else:
+            kept.add(other["stores"][0][0])
+    if set(stores) - kept:
+        raise refuse("without them a volatile frame store lies outside every fill")
+    if len(lost) != reach:
+        raise refuse(f"removing them takes the volatile store of {len(lost)} fills, not of the {reach} they reach")
+    return lost
 
 
 def store_key(touch):
