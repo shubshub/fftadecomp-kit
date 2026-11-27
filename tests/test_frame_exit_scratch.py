@@ -141,6 +141,25 @@ class WiringTests(unittest.TestCase):
             match.verify_leaf_instructions(bytes.fromhex("81b0684601b07047"), A, True, buffer_proof=proof())
 
 
+# A local chosen at a join (the walk keeps it apart), then a last call that leaves `first` in R2/R3.
+SPLIT_THEN_MERGED = """typedef unsigned short u16;
+extern void func_08000400(u16 value, u16 *out);
+u16 func_08000200(u16 value)
+{
+    u16 first[4];
+    u16 second[4];
+    u16 *chosen;
+
+    func_08000400(value, first);
+    func_08000400(value, second);
+    chosen = value ? first : second;
+    value = chosen[1];
+    func_08000400(value, first);
+    return value + first[3];
+}
+"""
+
+
 @unittest.skipUnless(tools_present(), "fixed compiler and ARM tools required")
 class FrameExitScratchNativeTests(unittest.TestCase):
     @classmethod
@@ -200,6 +219,24 @@ class FrameExitScratchNativeTests(unittest.TestCase):
         self.assertNotEqual(proof.fingerprint(), fingerprint)
         with patch.object(function_exit.FRAME_POLICY, "enabled", False), self.assertRaisesRegex(ValueError, ESCAPE):
             prove()
+
+    def test_a_split_then_merged_owner_projects_and_replays(self):
+        # chosen = value ? first : second splits at its join; the last call rewrites the scratch register that
+        # held it, so the return is reached in a merged state, where the worker left `first` in R2/R3.
+        root = self.fixture("split", LEAVES, SPLIT_THEN_MERGED)
+        code, output, report = run(root)
+        self.assertEqual(code, 0, output)
+        self.assertEqual(verification(report), evidence.STACK_BUFFER_SCHEMA)
+        lines = report.splitlines()
+        (split,) = [line for line in lines if line.startswith("* buffer split join: ")]
+        (line,) = self.scratch(report)
+        self.assertTrue(SITE.search(line), line)
+        self.assertTrue(self.replays(report, root))
+        self.assertFalse(self.replays(report.replace(line + "\n", ""), root))
+        self.assertFalse(self.replays(report.replace(split + "\n", ""), root))
+        code, output = check_report(root)
+        self.assertEqual(code, 0, output)
+        self.assertIn("report  identical to the saved", output)
 
     def test_owner_without_exit_scratch_is_unchanged(self):
         root = self.fixture("none", STORES, PLAIN % dict(size=4, last=3, extra=""))
