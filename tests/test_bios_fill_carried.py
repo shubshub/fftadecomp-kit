@@ -212,6 +212,29 @@ SPILLED = """void func_08000200(u16 *dest, u32 n, u32 *p, u32 *q)
     }
 }
 """
+# 0810EC04: the slot's address formed before a loop of calls and kept in sb; after the loop, with r0 holding the value
+# and r1 the literal it came from, agbcc copies sb to r3 to store through it (`mov r3, r9; strh r0, [r3]`) and
+# leaves r3 holding the slot's address at the BL into CpuSet
+STORE_BASE = """extern void func_08000600(void *);
+typedef struct { u32 a, b; u16 current; } State;
+typedef struct { u8 *status; u16 gradient[0xC0]; u16 backdrop[0xA0]; } Payload;
+void func_08000200(Payload *payload)
+{
+    State red, green, blue;
+    u16 i;
+    func_08000600(&red);
+    func_08000600(&green);
+    func_08000600(&blue);
+    for (i = 0; i < 0xC0; i++) {
+        func_08000600(&red);
+        func_08000600(&green);
+        func_08000600(&blue);
+        payload->gradient[i] = red.current | (green.current << 5) | (blue.current << 10);
+    }
+    { volatile u16 fill = 0x65C9; func_0814186C((const void *)&fill, payload->backdrop, 0x010000A0); }
+    *payload->status = 0;
+}
+"""
 HEAD = ("typedef unsigned char u8;\ntypedef unsigned short u16;\ntypedef unsigned int u32;\n"
         "extern void func_0814186C(const void *source, void *destination, u32 control);\n"
         "extern void func_08000400(u32);\nextern void func_08000700(u32, u32, u32, u32, u32);\n")
@@ -275,6 +298,22 @@ class CompiledTests(unittest.TestCase):
             self.assertEqual({state for _, (state, _) in result}, {"admitted"})
             (root / "config/functions.json").unlink()
             self.assertIn("is not stored exactly once", fill.cached(root, root, "src/08000200.c", HEAD + LOOP, set()))
+
+    def test_r3_left_holding_the_slot_as_its_store_s_base_is_admitted(self):
+        root = tree(self.directory.name, STORE_BASE)
+        code = [line.split("\t@")[0] for line in assembly(root, STORE_BASE).splitlines()
+                if line.startswith("\t") and not line.startswith("\t.")]
+        k = code.index("\tmov\tr3, r9")
+        self.assertEqual((code[k + 1], code[k + 6], code[k + 7]),
+                         ("\tstrh\tr0, [r3]", "\tmov\tr0, r9", "\tbl\tfunc_0814186C"))
+        result = fill.prove(root, root, "src/08000200.c", HEAD + STORE_BASE, set(),
+                            rom=(root / "baserom.bin").read_bytes())
+        (state, text), = {verdict for _, verdict in result}
+        self.assertEqual(state, "admitted", text)
+        self.assertRegex(text, r"held in sb from [0-9A-F]{8} across the calls at")
+        self.assertRegex(text, r"uses no bit of it\), r3 holds sp\+0x24 at the BL as the base of the store at "
+                               r"[0-9A-F]{8}; BIOS premise: CpuSet \(swi 0x0B\) reads only r0-r2 \(GBATEK\), so "
+                               r"nothing reads r3, control 0x010000a0")
 
     def test_a_spilled_address_is_not_carried(self):
         with self.assertRaisesRegex(proof.ProofError, "is not stored exactly once"):

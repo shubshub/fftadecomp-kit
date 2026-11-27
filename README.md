@@ -6206,7 +6206,13 @@ straight line, with no branch target between. In the code, which is the ROM's, e
 makes no access through a register offset whose base or index holds a stack
 address (`strh r0, [r1, r2]`: its address is unknown), stores the slot once,
 with the temporary's width, and at the BL holds its
-address in `r0`, no `r1` that fills over it and no `r3` in it; where the path
+address in `r0`, no `r1` that fills over it and no `r3` in it (except the
+slot's own address, left in `r3` as the base of that one store, when the BL
+reaches CpuSet as the ROM's bytes show it, `swi 0x0B; bx lr`: CpuSet reads only
+`r0`-`r2`, and agbcc copies a high register's slot address to `r3` to store
+through it; the fill's record then states that premise, `r3 holds sp+K at the
+BL as the base of the store at <site>; BIOS premise: CpuSet (swi 0x0B) reads
+only r0-r2 (GBATEK), so nothing reads r3`); where the path
 sets `r2` or the stored register to a literal or an immediate, it is the
 fill's control word or the value its RTL store writes (agbcc may keep a
 constant in a callee-saved register across calls, and the RTL check covers

@@ -51,36 +51,39 @@ holds:
 6. Each fill in R's code, which is the ROM's (rom_fill).  The fill's BL is its call's one site; a call that left no
    site (cross-jumping replaced the end of its block by a branch into another fill's identical tail) has the BL that
    the last insn of its block the code still holds reaches in a straight line, through unconditional branches only.
-   On every path into the BL: no access has a register offset whose base or index holds a stack address (its
-   address is unknown), one store of the temporary's width is the only access to the slot, r0 holds the slot's
-   address at the BL, r1 holds no stack address whose filled bytes reach the slot and r3 none in it, r2 and the
-   stored register, where the path sets them to a literal the ROM holds or to an immediate, are the fill's control
-   word and the value its RTL store writes, and the BL reaches the fill's BIOS call.  (agbcc may keep a constant in
-   a callee-saved register across calls and copy it from there; the path does not show that constant, and 5 reads it
-   off the RTL.)  A path is the straight line before the BL, back to a branch target, a branch, a call, or a change
-   of sp.  A path that shows no access to the slot may take the slot's address from a callee-saved register (r4-r11)
-   it reads before writing: agbcc may form the address once and keep it there across branches, loops and calls.
-   The register is taken as sp+K when every route into the path, walked backwards on the ROM's control-flow graph,
-   reaches a write of it whose own straight line makes it sp+K, with one K for all, before any other write of it,
-   any change of sp, a SWI or the function's entry; and when every call those routes cross passes kit #350's
-   callee-saved check (callee_saved_watch, Carrier), which walks the callee and requires the register and SP
-   returned unchanged and no bit of the register used.  The record names the register, its forming sites, the
-   calls and the premises that check states.  When that line starts at a branch target and holds no access to the slot r0 points at, the paths are
-   instead each of the target's predecessors (the fall-through, which may not be a call, every B and B<cond> to it,
-   and every far jump to it: agbcc's long branch, a BL the listing marks `@ far jump` to a branch target of the
-   function; a BL to the function's entry is a recursive call, which returns), read the same way and followed by the
-   line, up to MAX_PATHS paths of MAX_WINDOW instructions.  No other way in may exist: a function with a jump
-   through a register other than a return's bx (agbcc's jump tables and indirect jumps are `mov pc, rN`), with a
-   jump to no branch target or a BL into its body that is no marked far jump, or holding the target's address in a
-   word that is no instruction or forming it with `add rN, pc, #K`, refuses.  A path that joins, or one into a BL
-   several fills share, comes from one fill's block (its insns before the BL's own line belong to that block and to
-   no other fill's) and stores with an insn that is one of those fills' stores; each fill sharing the BL has a path,
-   and all its paths fill from one slot.  The order of the store and of the forming of the address is free: a
-   halfword has no sp-relative store, so its address is formed first, while a word may be stored at sp+K before r0
-   is formed.  Either way the qualifier's evidence is 4, the code it changes.
+   On every path into the BL: no access has a register offset whose base or index holds a stack address (its address
+   is unknown), one store of the temporary's width is the only access to the slot, r0 holds the slot's address at the
+   BL, r1 holds no stack address whose filled bytes reach the slot and r3 none in it (except the slot itself as the
+   base of that one store, when the BL reaches CpuSet, which reads only r0-r2: the record states that premise), r2
+   and the stored register, where the path sets them to a literal the ROM holds or to an immediate, are the fill's
+   control word and the value its RTL store writes, and the BL reaches the fill's BIOS call.  (agbcc may keep a
+   constant in a callee-saved register across calls and copy it from there; the path does not show that constant, and
+   5 reads it off the RTL.)  A path is the straight line before the BL, back to a branch target, a branch, a call, or
+   a change of sp.  A path that shows no access to the slot may take the slot's address from a callee-saved register
+   (r4-r11) it reads before writing: agbcc may form the address once and keep it there across branches, loops and
+   calls.  The register is taken as sp+K when every route into the path, walked backwards on the ROM's control-flow
+   graph, reaches a write of it whose own straight line makes it sp+K, with one K for all, before any other write of
+   it, any change of sp, a SWI or the function's entry; and when every call those routes cross passes kit #350's
+   callee-saved check (callee_saved_watch, Carrier), which walks the callee and requires the register and SP returned
+   unchanged and no bit of the register used.  The record names the register, its forming sites, the calls and the
+   premises that check states.  When that line starts at a branch target and holds no access to the slot r0 points
+   at, the paths are instead each of the target's predecessors (the fall-through, which may not be a call, every B
+   and B<cond> to it, and every far jump to it: agbcc's long branch, a BL the listing marks `@ far jump` to a branch
+   target of the function; a BL to the function's entry is a recursive call, which returns), read the same way and
+   followed by the line, up to MAX_PATHS paths of MAX_WINDOW instructions.  No other way in may exist: a function
+   with a jump through a register other than a return's bx (agbcc's jump tables and indirect jumps are `mov pc, rN`),
+   with a jump to no branch target or a BL into its body that is no marked far jump, or holding the target's address
+   in a word that is no instruction or forming it with `add rN, pc, #K`, refuses.  A path that joins, or one into a
+   BL several fills share, comes from one fill's block (its insns before the BL's own line belong to that block and
+   to no other fill's) and stores with an insn that is one of those fills' stores; each fill sharing the BL has a
+   path, and all its paths fill from one slot.  The order of the store and of the forming of the address is free: a
+   halfword has no sp-relative store, so its address is formed first, while a word may be stored at sp+K before r0 is
+   formed.  Either way the qualifier's evidence is 4, the code it changes.
 
-The record prints each fill's ROM site, slot, control word and any branch target its path joins at, the BIOS
-call's bytes and the digests of R's code and of each variant's.
+The record prints each fill's ROM site, slot, the register that carries its address with the calls it crosses and
+the premises the callee-saved check states (rule 6), the premise of an r3 left holding the slot (rule 6), control
+word and any branch target its path joins at, the BIOS call's bytes and the digests of R's code and of each
+variant's.
 """
 from collections import Counter
 from hashlib import sha256
@@ -816,7 +819,8 @@ def rom_fill(rom, address, compiled, fill, found=None, carrier=None):
     (target, predecessor)) of one fill, read off R's code (the ROM's); found is every fill of the function, of
     which those sharing the fill's BL are read with it.  With a Carrier, a path that shows no access to the slot
     may take the slot's address from a callee-saved register formed before calls (carried); fill["carried"]
-    states it for the record"""
+    states it for the record, and fill["r3"] the premise of each path that leaves the slot's address in r3 as its
+    store's base (stored_through_r3)"""
     _, base, size, _ = compiled["text"]
     instructions, labels = compiled["layout"]
     found = [fill] if found is None else found
@@ -1082,6 +1086,19 @@ def rom_fill(rom, address, compiled, fill, found=None, carrier=None):
             facts.append(fact + "".join(f"; callee-saved {text}" for text in premises))
         return seeds, facts, reasons
 
+    def stored_through_r3(store, slot, held):
+        """whether r3 holds the slot's address at the BL (held: the path's stack addresses there) only as the base of
+        the path's one store to it (store: the path's one access to the slot, which the caller has shown is a store)
+        into CpuSet as the ROM's bytes show it, `swi 0x0B; bx lr`.  CpuSet reads r0 (the source), r1 (the
+        destination) and r2 (the control word) and the wrapper nothing else, so r3 there is an address no code reads:
+        agbcc leaves it when it copies a high register's slot address to r3 to store through it (0x0810EC04:
+        `mov r3, sl; strh r0, [r3]`)"""
+        at, expected = CALLEES[CPUSET_NAME][:2]
+        if callee != CPUSET_NAME or rom[at - BASE:at - BASE + 4] != expected or held.get("r3") != slot:
+            return False
+        ops = [op.strip() for op in decode(store[3]).op_str.replace("[", "").replace("]", "").split(",")]
+        return ops[1] == "r3"
+
     index = call_of(fill)
     bl, callee = where(index), fill.get("callee", CPUSET_NAME)
     if proof.decode_bl(rom, bl) != CALLEES[callee][0]:
@@ -1150,8 +1167,14 @@ def rom_fill(rom, address, compiled, fill, found=None, carrier=None):
             if not uids.get(instructions[mine[0][3]], set()) & stores:
                 raise ProofError(f"the path into the BL at {bl:08X} stores its slot sp+{slot:#x} at "
                                  f"{where(mine[0][3]):08X}, which is no fill's store")
+        premises = []
         for register, span in (("r1", filled(owner["control"], width, callee)), ("r3", 1)):
             if register in held and overlaps(held[register], span, slot, width):
+                if register == "r3" and stored_through_r3(mine[0], slot, held):
+                    premises.append(f"r3 holds sp+{slot:#x} at the BL as the base of the store at "
+                                    f"{where(mine[0][3]):08X}; BIOS premise: CpuSet (swi 0x0B) reads only r0-r2 "
+                                    "(GBATEK), so nothing reads r3")
+                    continue
                 raise ProofError(f"the fill at {bl:08X} passes {register} sp+{held[register]:#x}, which reaches its "
                                  "own temporary")
         if "r2" in known and known["r2"] != owner["control"]:
@@ -1161,14 +1184,15 @@ def rom_fill(rom, address, compiled, fill, found=None, carrier=None):
         if value is not None and mine[0][4] is not None and mine[0][4] & (1 << 8 * width) - 1 != value:
             raise ProofError(f"the store at {where(mine[0][3]):08X} writes {mine[0][4] & (1 << 8 * width) - 1:#x} "
                              f"to the slot sp+{slot:#x}, not the fill's value {value:#x}")
-        paths.append((owner, slot, where(formed[slot]), joins, facts))
+        paths.append((owner, slot, where(formed[slot]), joins, facts, premises))
     for one in sharing:
-        slots = {slot for owner, slot, _, _, _ in paths if owner is one}
+        slots = {slot for owner, slot, _, _, _, _ in paths if owner is one}
         if len(slots) != 1:
             raise ProofError(f"the fill at insn UID {one['call'].uid} reaches the BL at {bl:08X} by "
                              f"{'no path of its own' if not slots else 'paths with different slots'}")
-    _, slot, formed, joins, _ = next(path for path in paths if path[0] is fill)
-    fill["carried"] = sorted({fact for owner, _, _, _, facts in paths if owner is fill for fact in facts})
+    _, slot, formed, joins, _, _ = next(path for path in paths if path[0] is fill)
+    fill["carried"] = sorted({fact for owner, _, _, _, facts, _ in paths if owner is fill for fact in facts})
+    fill["r3"] = sorted({text for owner, _, _, _, _, premises in paths if owner is fill for text in premises})
     return bl, slot, formed, joins
 
 
@@ -1253,6 +1277,7 @@ def prove(tree, project, relpath, raw, admitted, rom=None, dependencies=None):
         where = f"macro {g['name']}, used {len(removed)} times" if g["kind"] == "macro" else "a block"
         listed = "; ".join(f"{bl:08X} fills from sp+{slot:#x} (address formed at {formed:08X}, "
                            + "".join(f"{fact}, " for fact in found[k].get("carried", ()))
+                           + "".join(f"{text}, " for text in found[k].get("r3", ()))
                            + "".join(f"joining at {label:08X} from {at:08X}, " for label, at in joins)
                            + f"control {found[k]['control']:#010x}, {found[k]['width']}-byte units)"
                            for k, (bl, slot, formed, joins) in enumerate(sites) if k in removed)
