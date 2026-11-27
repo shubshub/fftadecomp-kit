@@ -165,7 +165,14 @@ class DmaFillPremiseWalkTests(unittest.TestCase):
         # the join is before the window: the destination store follows a join of two derivations
         self.refused(source(before=joined, destination=""), "destination is not an exact unit-aligned address "
                      r"\(it has no defined derivation, so no premise can be stated\)")
+        # two defined but different derivations (a frame load, entry_R1) do not join to either one
+        joined = "cmp r1, #0\nbeq 1f\nldr r3, [sp, #4]\nb 2f\n1:\nadds r3, r1, #0\n2:"
+        self.refused(source(before=joined, destination=""), "destination is not an exact unit-aligned address "
+                     r"\(it has no defined derivation, so no premise can be stated\)")
         self.refused(source(count="ldrh r2, [r2, r1]"), r"count has no defined derivation")
+        # and the same for the count: two loads from different sites
+        self.refused(source(count="cmp r1, #0\nbeq 1f\nldrh r2, [r2, #6]\nb 2f\n1:\nldrh r2, [r2, #4]\n2:"),
+                     r"count has no defined derivation")
 
     def test_a_frame_address_destination_stays_an_escape(self):
         self.refused(source(destination="add r3, sp, #4"), base.ESCAPE)
@@ -285,6 +292,30 @@ class DmaFillPremiseNativeTests(unittest.TestCase):
         self.assertTrue(self.replays(root, report))
         self.assertFalse(self.replays(root, report.replace(stated + "\n", "")))
         self.assertFalse(self.replays(root, report.replace(stated, stated.replace("DMA3", "DMA2"))))
+
+    def test_a_call_free_premised_fill_is_admitted_on_the_plain_frame_route(self):
+        # No call: the plain frame walk admits it (not the stack-argument retry), and report_matches replays
+        # it on the plain framed (data) profile, each with the premise file read.
+        text = base.HEADER + base.FILL + """
+typedef struct { u16 unknown_00[3]; u16 size; } Config;
+
+void func_08000200(void *destination, const Config *config)
+{
+    fill16(destination, 0x81000000 | (config->size / 2));
+}
+"""
+        root = base.build(self.base / "callfree", text)
+        code, output, report = base.run(root)
+        self.assertNotEqual(code, 0, output)
+        generated, _ = json.JSONDecoder().raw_decode(output.split("add:\n", 1)[1])
+        rows = generated["0x08000200"]["rows"]
+        (root / premise.PREMISES_PATH).write_bytes(entry(rows, address=base.A))
+        code, output, report = base.run(root)
+        self.assertEqual(code, 0, output)
+        self.assertIn("* verification: `elf-symbol-thumb-frame-data-v1`", report.splitlines())   # DMA registers
+        self.assertTrue(self.replays(root, report))
+        (root / premise.PREMISES_PATH).write_bytes(entry(rows, REVIEW + " Rechecked.", base.A))
+        self.assertFalse(self.replays(root, report))
 
     def test_a_premised_fill_beside_an_exact_fill_records_both_and_replays(self):
         # kit #239's natural layout (fill, call, fill), its first fill premised
