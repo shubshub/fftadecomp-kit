@@ -61,6 +61,20 @@ re-decodes the verified body as raw Thumb-1 and runs one abstract interpretation
 threshold widening, word-level frame kinds, a must-initialised byte set, and one
 derivation expression per register).
 
+The branch refinement reaches every register that holds the compared value, not
+only the compared register.  Registers form copy classes: an exact register copy
+(`adds Rd,Rs,#0`, `movs Rd,Rs` or `mov Rd,Rs`) puts Rd in Rs's class, and any
+other write to a register, a call's clobbers included, takes it out of its class.
+At a join two registers stay in one class only if they are in one class on every
+incoming path.  Registers in one class therefore hold one 32-bit value, so a
+conditional branch on `cmp Rn, ...` refines each member of Rn's class with its
+own range, and an edge none of them can take is infeasible.  The compare's flags
+are already forgotten when Rn or the compared operand is written, so they still
+describe the class's value at the branch.  This only narrows ranges the walk
+computes; nothing about memory or callees is assumed.  The frame-words analysis
+(``stack_index_frame_words_profile``) writes registers in its own transfer
+functions, so its states carry no classes and it is unchanged.
+
 `named-data-buffer-stack-index-v2` is the same contract with two additions, both
 off under v1 so that v1 reports keep their meaning:
 
@@ -538,20 +552,39 @@ def widen(old, new, thresholds, visits):
     return norm("A", lo, hi, new[3] if lo == new[1] and hi == new[2] else 0, True)
 
 
-class State:
-    __slots__ = ("kinds", "init", "regs", "exprs", "flags")
+def classes(labels):
+    """Name each register's copy class by its lowest member, so equal partitions compare equal."""
+    first = {}
+    return tuple(first.setdefault(label, register) for register, label in enumerate(labels))
 
-    def __init__(self, kinds, init, regs, exprs, flags):
+
+def apart(same, registers):
+    """Copy classes after each of ``registers`` is written with a value of its own."""
+    if same is None:
+        return None
+    labels = list(same)
+    for register in registers:
+        labels[register] = 16 + register        # no class name is 16 or more
+    return classes(labels)
+
+
+class State:
+    __slots__ = ("kinds", "init", "regs", "exprs", "flags", "same")
+
+    def __init__(self, kinds, init, regs, exprs, flags, same=None):
         self.kinds, self.init, self.regs, self.exprs, self.flags = kinds, init, regs, exprs, flags
+        # same[n] == same[m]: Rn and Rm hold one value, one being an exact register copy of the
+        # other with neither written since (see ``classes``).  None tracks no classes.
+        self.same = same
 
     def key(self):
-        return (self.kinds, self.init, self.regs, self.exprs, self.flags)
+        return (self.kinds, self.init, self.regs, self.exprs, self.flags, self.same)
 
     def __eq__(self, other):
         return type(other) is State and self.key() == other.key()
 
     def copy(self):
-        return State(self.kinds, self.init, list(self.regs), list(self.exprs), self.flags)
+        return State(self.kinds, self.init, list(self.regs), list(self.exprs), self.flags, self.same)
 
     def freeze(self):
         self.regs, self.exprs = tuple(self.regs), tuple(self.exprs)
@@ -639,9 +672,18 @@ class Analysis:
             refuse("stack-pointer or program-counter write")
         state.regs[register] = value
         state.exprs[register] = expr if value[0] == "S" else None
+        state.same = apart(state.same, (register,))
         if state.flags is not None and (state.flags[0] == register or
                                         state.flags[1] == ("reg", register)):
             state.flags = None
+
+    def copied(self, state, register, source, before):
+        """After ``write``: ``register`` holds an exact copy of ``source``, so it is in the copy
+        class ``source`` was in before the write (``before``); a copy onto itself keeps its class."""
+        if before is not None:
+            labels = list(before)
+            labels[register] = before[source]
+            state.same = classes(labels)
 
     def scalar_use(self, state, registers, what):
         """Registers read by an instruction that is no allowed ranged use."""
@@ -869,7 +911,11 @@ class Analysis:
                 expr = self.expr(state, source)
         else:
             result = value
+        before = state.same
         self.write(state, destination, result, expr)
+        if amount == 0:
+            # `adds Rd, Rs, #0` (or `subs Rd, Rs, #0`) copies Rs exactly.
+            self.copied(state, destination, source, before)
 
     def copy_site(self, state, site):
         destination, count = self.copies[site]
@@ -920,6 +966,7 @@ class Analysis:
             for register in (0, 1, 2, 3, 12, 14):
                 state.regs[register] = TOP
                 state.exprs[register] = None
+            state.same = apart(state.same, (0, 1, 2, 3, 12, 14))
             if result is not None:
                 state.regs[0] = result
             else:
@@ -936,14 +983,22 @@ class Analysis:
             if state.flags is not None:
                 register, (kind, operand) = state.flags
                 right = const(operand) if kind == "imm" else self.read(state, operand)
-                taken_value, fall_value = refine(condition, state.regs[register], right)
-                taken, fall = None, None
-                if taken_value is not None:
-                    taken = state.copy()
-                    taken.regs[register] = taken_value
-                if fall_value is not None:
-                    fall = state.copy()
-                    fall.regs[register] = fall_value
+                # Every member of the compared register's copy class holds the compared value.
+                holders = [register] if state.same is None else \
+                    [n for n in range(16) if n not in (13, 15) and state.same[n] == state.same[register]]
+                taken, fall = state.copy(), state.copy()
+                for holder in holders:
+                    taken_value, fall_value = refine(condition, state.regs[holder], right)
+                    if taken is not None:
+                        if taken_value is None:
+                            taken = None
+                        else:
+                            taken.regs[holder] = taken_value
+                    if fall is not None:
+                        if fall_value is None:
+                            fall = None
+                        else:
+                            fall.regs[holder] = fall_value
             return [(target, taken), (follow, fall)]
         if raw & 0xF800 == 0xE000:
             displacement = raw & 0x7FF
@@ -1078,8 +1133,11 @@ class Analysis:
                 value = self.read(state, source)
                 if source == 13:
                     self.origins.add(value[1])
+                before = state.same
                 self.write(state, destination, value, None if source in (13, 15) else
                            self.expr(state, source))
+                if source not in (13, 15):
+                    self.copied(state, destination, source, before)
             return [(follow, state)]
         if raw & 0xFC00 == 0x4000:
             operation = (raw >> 6) & 15
@@ -1117,7 +1175,9 @@ class Analysis:
             destination, source = r(raw), r(raw >> 3)
             value = state.regs[source]
             if operation == 0 and amount == 0:
+                before = state.same
                 self.write(state, destination, value, self.expr(state, source))
+                self.copied(state, destination, source, before)
             else:
                 self.scalar_use(state, (source,), "a shift")
                 result = TOP
@@ -1224,11 +1284,13 @@ class Analysis:
             regs.append(widen(previous, joined, self.thresholds, visits))
         exprs = tuple(left if left == right else None for left, right in zip(old.exprs, new.exprs))
         flags = old.flags if old.flags == new.flags else None
-        return State(old.kinds, old.init & new.init, tuple(regs), exprs, flags)
+        # Two registers stay in one copy class only if they are in one class on both paths.
+        same = None if old.same is None or new.same is None else classes(tuple(zip(old.same, new.same)))
+        return State(old.kinds, old.init & new.init, tuple(regs), exprs, flags, same)
 
     def run(self):
         exprs = tuple(("entry", n) if n < 4 else None for n in range(16))
-        entry = State((), frozenset(), tuple([TOP] * 16), exprs, None)
+        entry = State((), frozenset(), tuple([TOP] * 16), exprs, None, tuple(range(16)))
         states, visits, pending, updates = {self.address: entry}, {}, [self.address], 0
         while pending:
             site = pending.pop()

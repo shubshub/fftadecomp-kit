@@ -3929,6 +3929,12 @@ tries, in order:
    conditional-branch refinement and loop widening (the analysis used by
    `bounded-local-index-v1`) show every byte the access can touch is inside
    the array. Nothing is assumed and the access is listed under `accesses`.
+   A branch refines every register holding the compared value, not only the
+   compared one: an exact register copy (`adds Rd,Rs,#0`, `movs Rd,Rs`,
+   `mov Rd,Rs`) joins the source's copy class, any other write leaves it, and
+   a join keeps two registers in one class only if every incoming path does.
+   So `index = mode; if (mode == 2) index = 0;` bounds `index` by the compare
+   on `mode` (0x080EF970). The frame-words analysis keeps no classes.
 2. **Premise.** Otherwise the index must have a *defined source*: an entry
    register R0-R3, a load through a defined address (a struct field), the value
    a call returned in R0, or a constant, combined by masks, shifts, adds,
