@@ -87,7 +87,7 @@ BUFFER_SUMMARY = "ROM-checked bounded non-escaping register buffer arguments"
 STACK_BUFFER_SCHEMA = "elf-symbol-thumb-frame-buffer-calls-v2"
 STACK_BUFFER_SUMMARY = "ROM-checked bounded register and stack buffer arguments with returned alias provenance"
 # Every buffer evidence line starts with BUFFER_LINES: match.py's two BUFFER_HEAD_LINES, then
-# BufferCallProof.loop_replay_lines() and bios_summary_lines().  A report check without buffer
+# BufferCallProof.loop_replay_lines(), bios_summary_lines() and exit_r12_lines().  A report check without buffer
 # evidence refuses the prefix whole and one with it holds buffer_proof_lines to its proof, so a
 # new kind of buffer line needs no list extended to be refused where it is not recomputed.
 BUFFER_LINES = "* buffer"
@@ -498,7 +498,8 @@ def verify_dependencies(preprocessed, root, address):
 
 def buffer_proof_lines(lines):
     """The report's buffer lines other than the two head lines, indented or not; a replay holds
-    them to proof.loop_replay_lines() + proof.bios_summary_lines(), the order match.py writes."""
+    them to proof.loop_replay_lines() + proof.bios_summary_lines() + proof.exit_r12_lines(), the
+    order match.py writes."""
     return [line for line in lines if line.lstrip().startswith(BUFFER_LINES)
             and not line.startswith(BUFFER_HEAD_LINES)]
 
@@ -580,7 +581,8 @@ def buffer_report_matches(lines, root, address, mapping, stack_arguments=False, 
             for item in instructions)
         if not (proof.buffer_evidence() and ("* control flow: closed leaf CFG" in lines) == leaf and
                 fingerprints == [f"* buffer proof SHA-256: `{proof.fingerprint()}`"] and
-                buffer_proof_lines(lines) == proof.loop_replay_lines() + proof.bios_summary_lines() and
+                buffer_proof_lines(lines) == proof.loop_replay_lines() + proof.bios_summary_lines() +
+                proof.exit_r12_lines() and
                 [line for line in lines if line.lstrip().startswith(LINE_PREFIX)] == premises):
             return False
         if parts is not None:
@@ -684,7 +686,8 @@ def function_address_report_matches(lines, root, address, buffer_profile=False, 
                     unquote("* buffer proof SHA-256: ") != proof.fingerprint() or \
                     unquote("* function buffer proof SHA-256: ") != function_buffer_fingerprint(
                         address, data, manifest, source_digest, functions, proof.fingerprint()) or \
-                    buffer_proof_lines(lines) != proof.loop_replay_lines() + proof.bios_summary_lines() or \
+                    buffer_proof_lines(lines) != proof.loop_replay_lines() + proof.bios_summary_lines() + \
+                    proof.exit_r12_lines() or \
                     [line for line in lines if line.lstrip().startswith(LINE_PREFIX)] != premise_lines(proof):
                 return False
             control_flow = CALL_SUMMARY
