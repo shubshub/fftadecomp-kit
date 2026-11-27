@@ -443,6 +443,31 @@ class IwramImageTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.prove()
 
+    def test_an_image_call_refused_through_a_frame_word_is_walked_with_its_flags(self):
+        # func_f saves the owner's address held in R4 to its own frame, makes the flags depend on it
+        # (adds r1, r4, #0) and clears R1 and R4 without touching them (mov from r8), then calls img_flag with that
+        # frame word's address in R0: refused unresolved ("the address of a frame word that may hold an
+        # owner stack address"), so it is resolved into the image.  No register holds the owner's
+        # address, only the flags depend on it, and img_flag branches on them first: it is walked, as a
+        # ROM callee would be, and the branch refuses; its summary would not see the flags.
+        image = IMAGE.replace("img_quiet:\n", "img_flag:\n    beq 1f\n    movs r0, #0\n1:  bx lr\nimg_quiet:\n")
+        body = ("push {r4, lr}\nsub sp, #8\nmov r4, sp\nbl func_f\nmovs r3, #0\nstr r3, [r4]\n"
+                "add sp, #8\npop {r4}\npop {r0}\nbx r0\n.ltorg")
+        target = f"0x{DESTINATION:08X} + (img_flag - img_start) + 1"
+        inner = (f"push {{r4, lr}}\nldr r2, ={target}\nadds r1, r4, #0\nmov r1, r8\nmov r4, r8\nmov r0, sp\nbl 0x{R2:08X}\n"
+                 "pop {r4}\npop {r0}\nbx r0\n.ltorg")
+        with patch(f"{__name__}.IMAGE", image):
+            text = assembly(body)
+        text = text.replace("owner_end:\n", f"owner_end:\n.balign 4\n.global func_f, func_f_end\nfunc_f:\n{inner}\n"
+                            "func_f_end:\n", 1)
+        (self.root / "f.s").write_text(text)
+        self.build_text()
+        self.entries.append({"rom": f"0x{self.symbols['func_f']:08X}", "end": f"0x{self.symbols['func_f_end']:08X}",
+                             "mode": "thumb"})
+        with self.assertRaisesRegex(ValueError, "a conditional branch at 0x[0-9A-F]{8} tests flags set from a "
+                                                "watched callee-saved register's value"):
+            self.prove()
+
     def test_a_crossing_continuation_walks_an_image_call(self):
         # The real path (0x08005954): the callback's fact in R4 crosses a call whose callee hands back a
         # copy of R4 in R3, so the crossing check's own callee-saved walk continues in the caller and
