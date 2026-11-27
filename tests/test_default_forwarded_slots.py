@@ -65,8 +65,9 @@ class DefaultForwardingTests(unittest.TestCase):
         self.assertEqual(lines, [
             f"{forwarded.SLOTS_FIELD}`{forwarded.SCHEMA}` inspected callees store owner frame pointers in their own "
             f"frames, tracked word by word: 0x{FWD:08X} store 0x{STORE:08X} word entry_SP-0x8 = owner "
-            f"entry_SP-0x8; released below the owner's SP after call 0x{FIRST_CALL:08X}: entry_SP-0x14; trusted "
-            f"calls while released words exist: none", forwarded.PREMISE_FIELD + forwarded.PREMISE])
+            f"entry_SP-0x8; released inside callees at 0x{FWD + 10:08X} in 0x{FWD:08X}; released below the "
+            f"owner's SP after call 0x{FIRST_CALL:08X}: entry_SP-0x14; trusted calls while released words exist: "
+            f"none", forwarded.PREMISE_FIELD + forwarded.PREMISE])
         self.assertEqual(proof.loop_replay_lines()[-2:], lines)
         self.assertIsNotNone(forwarded.fingerprint_payload(proof))
 
@@ -126,6 +127,28 @@ class DefaultForwardingTests(unittest.TestCase):
         self.assertEqual(lines[1], forwarded.PREMISE_FIELD + forwarded.PREMISE)
         self.assertIn(f"trusted calls while released words exist: 0x{SECOND_CALL:08X} to 0x{OTHER:08X}", lines[0])
 
+    def test_a_release_a_callee_push_ends_still_states_the_premise(self):
+        # FWD releases its slot (add sp,#4), calls OTHER with no stack pointer (trusted while the
+        # owner pointer sits in the released word below its SP), then push {r4} writes the word, so no word
+        # comes back to the owner.  The trusted call relied on the premise, so the report states it.
+        fwd = [0xb500, 0xb081, 0x9100, LEAF, 0xb001, OTHER, 0xb410, 0xbc10, 0xbc01, 0x4700]
+        proof = walk(bodies(fwd=fwd))
+        self.assertEqual(proof.forward_releases, {})
+        self.assertEqual(proof.forward_trusted_calls, {(FWD, FWD + 12, OTHER)})
+        self.assertEqual(proof.forward_callee_releases, {(FWD, FWD + 10)})
+        lines = forwarded.lines(proof)
+        self.assertEqual(lines[1], forwarded.PREMISE_FIELD + forwarded.PREMISE)
+        self.assertIn(f"released inside callees at 0x{FWD + 10:08X} in 0x{FWD:08X}; released below the owner's "
+                      f"SP after none; trusted calls while released words exist: 0x{FWD + 12:08X} to "
+                      f"0x{OTHER:08X}", lines[0])
+        # Without the trusted call the release still relied on the premise (interrupt handlers) until the PUSH.
+        proof = walk(bodies(fwd=[0xb500, 0xb081, 0x9100, LEAF, 0xb001, 0xb410, 0xbc10, 0xbc01, 0x4700]))
+        self.assertEqual((proof.forward_releases, proof.forward_trusted_calls), ({}, set()))
+        self.assertEqual(forwarded.lines(proof)[1], forwarded.PREMISE_FIELD + forwarded.PREMISE)
+        payload = forwarded.fingerprint_payload(proof)
+        proof.forward_callee_releases.clear()
+        self.assertNotEqual(forwarded.fingerprint_payload(proof), payload)
+
     def test_a_later_walked_call_inherits_the_released_word(self):
         proof = walk(bodies(after=(0xa901, FWD)))
         self.assertEqual(proof.forward_releases, {FIRST_CALL: {-20}, OWNER + 12: {-20}})
@@ -172,9 +195,10 @@ class DefaultForwardingTests(unittest.TestCase):
         proof.forward_slot_records.add((FWD, STORE, -8, -8))
         proof.forward_trusted_calls.add((OWNER, FIRST_CALL, OTHER))
         proof.forward_releases[FIRST_CALL] = {-20}
+        proof.forward_callee_releases.add((FWD, FWD + 10))
         proof._restore_ledgers(saved)
-        self.assertEqual((proof.forward_slot_records, proof.forward_trusted_calls, proof.forward_releases),
-                         (set(), set(), {}))
+        self.assertEqual((proof.forward_slot_records, proof.forward_trusted_calls, proof.forward_releases,
+                          proof.forward_callee_releases), (set(), set(), {}, set()))
 
     def test_construction_guards(self):
         rom, mapping = base.build(bodies())
@@ -269,13 +293,20 @@ s16 func_08000200(void)
 """
 
 
-def build_native(root, text, objects):
+# The same wrapper, but after the call it releases its slot (add sp,#4), calls OTHER2 with no stack pointer
+# (trusted while the pointer sits below its SP) and then pushes over the word: no word reaches the owner.
+OTHER2 = 0x08000600
+TRUSTING_CODE = [0xb500, 0xb081, 0x9000, 0x2000, 0x2100, 0x2200, 0x2300, CALLEE, 0xb001, OTHER2, 0xb410, 0xbc10,
+                 0xbc01, 0x4700]
+
+
+def build_native(root, text, objects, callees=((WRAPPER, WRAPPER_CODE), (CALLEE, CALLEE_CODE))):
     root = Path(root)
     for name in ("src", "include", "config", "symbols", "build"):
         (root / name).mkdir(parents=True, exist_ok=True)
     rom = bytearray(0x1000)
     spans = []
-    for address, code in ((WRAPPER, WRAPPER_CODE), (CALLEE, CALLEE_CODE)):
+    for address, code in callees:
         raw = base.assemble(address, code)
         rom[address - match.ROM_BASE:address - match.ROM_BASE + len(raw)] = raw
         spans.append({"rom": f"0x{address:08X}", "end": f"0x{address + len(raw):08X}", "mode": "thumb"})
@@ -318,8 +349,8 @@ class DefaultForwardingNativeTests(unittest.TestCase):
         with unittest.mock.patch.dict(os.environ, FFTA_ROM=str(Path(root) / "baserom.bin")):
             return evidence.report_matches(report, root, A)
 
-    def check(self, name, text, objects, schema):
-        root = build_native(self.base / name, text, objects)
+    def check(self, name, text, objects, schema, callees=((WRAPPER, WRAPPER_CODE), (CALLEE, CALLEE_CODE))):
+        root = build_native(self.base / name, text, objects, callees)
         code, output, report = dma_tests.run(root)
         self.assertEqual(code, 0, output)
         self.assertIn("verdict MATCH - byte identical", output)
@@ -334,9 +365,24 @@ class DefaultForwardingNativeTests(unittest.TestCase):
         code, output = dma_tests.check_report(root)
         self.assertEqual(code, 0, output)
         self.assertIn("report  identical to the saved", output)
+        return report
 
     def test_a_wrapper_forwarding_the_owners_local_matches_and_replays(self):
         self.check("plain", NATIVE % dict(extern="", store=""), {}, evidence.STACK_BUFFER_SCHEMA)
+
+    def test_a_wrapper_that_trusts_a_call_and_pushes_over_the_word_states_the_premise(self):
+        # The same through match.py: the release ends inside the wrapper, and the premise is still stated.
+        callees = ((WRAPPER, TRUSTING_CODE), (CALLEE, CALLEE_CODE), (OTHER2, [0x4770]))
+        report = self.check("trusting", NATIVE % dict(extern="", store=""), {}, evidence.STACK_BUFFER_SCHEMA,
+                            callees)
+        premise = forwarded.PREMISE_FIELD + forwarded.PREMISE
+        self.assertIn(premise, report.splitlines())
+        (stated,) = [line for line in report.splitlines() if line.startswith(forwarded.SLOTS_FIELD)]
+        self.assertIn(f"released inside callees at 0x{WRAPPER + 18:08X} in 0x{WRAPPER:08X}; released below the "
+                      f"owner's SP after none; trusted calls while released words exist: 0x{WRAPPER + 20:08X} to "
+                      f"0x{OTHER2:08X}", stated)
+        root = self.base / "trusting"
+        self.assertFalse(self.replays(root, report.replace(premise + "\n", "")))
 
     def test_the_same_beside_typed_data_uses_the_data_buffer_schema(self):
         import data_buffer_profile

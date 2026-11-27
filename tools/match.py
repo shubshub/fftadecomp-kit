@@ -3606,7 +3606,7 @@ class BufferCallProof:
     # outgoing stack arguments (see forwarded_slot_step); off keeps every such store refused.
     forwarded_stack_arguments = False
     default_forwarding = False      # forwarded_slot_profile: set only by forward_slots=True
-    forward_slot_records = forward_trusted_calls = frozenset()
+    forward_slot_records = forward_trusted_calls = forward_callee_releases = frozenset()
     # Opt-in per class (read from the class's own __dict__, never inherited): a
     # subclass's hooks and ledgers have not been reviewed against per-state exploration.
     _loop_replay_opt_in = True
@@ -3699,6 +3699,7 @@ class BufferCallProof:
             self.forwarded_stack_arguments = self.default_forwarding = True
             self.forward_slot_records, self.forward_trusted_calls = set(), set()
             self.forward_releases = {}          # owner call site -> owner entry-SP offsets released there
+            self.forward_callee_releases = set()  # (inspected callee, its ADD SP) that released a live slot
             self.forward_inherited = set()      # owner call sites whose callee inherited released words
         self.discarded_exit_scratch_sites = set()
         self.rom = rom
@@ -3889,7 +3890,8 @@ class BufferCallProof:
                 ({key: dict(record) for key, record in self.call_via_records.items()},
                  dict(self.call_via_effective)),
                 (set(self.forward_slot_records), set(self.forward_trusted_calls),
-                 {site: set(words) for site, words in self.forward_releases.items()})
+                 {site: set(words) for site, words in self.forward_releases.items()},
+                 set(self.forward_callee_releases))
                 # Only the default forwarding proofs: the opt-in forwarding policies keep their ledgers as before.
                 if self.default_forwarding else None)
 
@@ -3902,6 +3904,8 @@ class BufferCallProof:
                 ledger.update(values)
             self.forward_releases.clear()
             self.forward_releases.update(forward_snapshot[2])
+            self.forward_callee_releases.clear()
+            self.forward_callee_releases.update(forward_snapshot[3])
         self.split_joins.clear()
         self.split_joins.update(split_snapshot)
         self.call_via_records.clear()
@@ -4057,7 +4061,7 @@ class BufferCallProof:
                         (adjustment := thumb_literal_stack_adjustment(instruction, data, address)) is not None:
                     if self.forwarded_stack_arguments:
                         self.forwarded_frame_change(aliases, depth, depth - adjustment, by_address,
-                                                    writes=False)
+                                                    writes=False, site=(address, instruction.address))
                     depth -= adjustment
                     if self.callee_frames:
                         if adjustment < 0:
@@ -4369,7 +4373,7 @@ class BufferCallProof:
         finally:
             self.active.remove(address)
 
-    def forwarded_frame_change(self, aliases, before, after, by_address, *, writes):
+    def forwarded_frame_change(self, aliases, before, after, by_address, *, writes, site=None):
         """Apply an SP move from ``before`` to ``after`` words to forwarded slots and released words.
 
         Releasing a live slot (ADD SP) leaves the pointer in memory below SP, so the word
@@ -4385,6 +4389,10 @@ class BufferCallProof:
         for slot in forwarded_slots(aliases):
             if slot < -4 * after:
                 aliases[FORWARD_STALE_BASE + slot] = aliases.pop(slot)
+                if self.default_forwarding:
+                    # Recorded even when a later PUSH ends the word inside the callee: until then a
+                    # trusted call or an interrupt handler could read it (forwarded_slot_profile.PREMISE).
+                    self.forward_callee_releases.add(site)
         covered = range(-4 * after, -4 * before)
         for position, key in stale_words(aliases).items():
             if position in covered:
