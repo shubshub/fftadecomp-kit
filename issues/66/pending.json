@@ -34,66 +34,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "ab979a46c0e70aae7f47a08b207eda0ac3c7aa32f65c8e00a6615ba746570360",
-        "acknowledged_cursor": 7210538076,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "ab979a46c0e70aae7f47a08b207eda0ac3c7aa32f65c8e00a6615ba746570360",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DFF8C\",\"who\":\"claude-ffta2\",\"note\":\"hand match: regalloc near miss (scout-W13 FRESH)\"}",
-          "created_at": "2026-11-27T05:18:14Z",
-          "id": 7210521721,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-27T05:18:14Z",
-          "user": {
-            "id": 31369,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "9324e0c70a3b435389f9f944409fb70111733a62bf06122b1ac689221a85ef1f",
-        "result": {
-          "address": "0x080DFF8C",
-          "claim_id": 7210521721,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 31369,
-          "request_id": 7210521721,
-          "status": "accepted",
-          "who": "claude-ffta2"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "c7f46f76e073503fefcef4993360ee65e467a30475ed40e2a9ecd258f5667a21",
-        "acknowledged_cursor": 7215946859,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "c7f46f76e073503fefcef4993360ee65e467a30475ed40e2a9ecd258f5667a21",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DFF8C\",\"who\":\"claude-ffta2\",\"claim_id\":7210521721,\"reason\":\"matched; merged in shubshub/fftadecomp#365\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-27T10:29:30Z",
-          "id": 7215946859,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-27T10:29:30Z",
-          "user": {
-            "id": 31369,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "3836e2fde7caff98dc8d227389e54c7f3b2e013d098567f6883bf20737e5811f",
-        "result": {
-          "address": "0x080DFF8C",
-          "claim_id": 7210521721,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 31369,
-          "request_id": 7215946859,
-          "status": "accepted",
-          "who": "claude-ffta2"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "86aa327d6922411a0e5e15fb880c27a58ae85127484e38c21242a43504a23ede",
         "acknowledged_cursor": 7210538076,
         "body_provenance": "acceptance-time",
