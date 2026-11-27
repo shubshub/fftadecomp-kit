@@ -467,19 +467,23 @@ class OptInSiteTests(unittest.TestCase):
         (node,) = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == function]
         return [f"{call.func.value.id}.{call.func.attr}" for call in ast.walk(node)
                 if isinstance(call, ast.Call) and isinstance(call.func, ast.Attribute) and
-                isinstance(call.func.value, ast.Name) and call.func.value.id in ("closure", "default_index")]
+                isinstance(call.func.value, ast.Name) and call.func.value.id in ("closure", "default_index", "store_bound")]
 
     def test_sites(self):
+        # The plain-path walks of match.py, its replay and the function thunk reach closure.walk through
+        # store_bound_premise_profile.walk, whose own retry follows the default ones.
         expected = {("match.py", "verify_function_buffers"): ["closure.walk"],
-                    ("data_buffer_profile.py", "prove"): ["closure.retry", "closure.retry"],
-                    ("match_evidence.py", "buffer_report_matches"): ["closure.walk"],
-                    ("function_thunk_profile.py", "verify_source"): ["closure.walk"]}
+                    ("data_buffer_profile.py", "prove"): ["closure.retry", "closure.retry", "store_bound.retry"],
+                    ("match_evidence.py", "buffer_report_matches"): ["store_bound.walk"],
+                    ("function_thunk_profile.py", "verify_source"): ["store_bound.walk"],
+                    ("store_bound_premise_profile.py", "walk"): ["closure.walk"]}
         for (path, function), calls in expected.items():
             with self.subTest(function=function):
-                self.assertEqual([call for call in self.calls_in(path, function)
-                                  if call.endswith((".walk", ".retry"))], calls)
+                self.assertEqual(sorted(call for call in self.calls_in(path, function)
+                                        if call.endswith((".walk", ".retry"))), calls)
         main = self.calls_in("match.py", "main")
-        self.assertEqual(main.count("closure.walk"), 1)
+        self.assertEqual(main.count("store_bound.walk"), 1)
+        self.assertNotIn("closure.walk", main)
         self.assertNotIn("default_index.walk", main)
 
 
