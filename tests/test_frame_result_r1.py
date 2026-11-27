@@ -64,22 +64,38 @@ class ScanTests(unittest.TestCase):
                         0x08013020: struct.pack("<I", F + 0x05000000), 0x08013029: struct.pack("<I", F + 0x01000000),
                         0x08013030: struct.pack("<I", F + 0x06000000), 0x0801303A: struct.pack("<I", (F | 1) + 0x01000000),
                         0x08013040: struct.pack("<I", F + 0x03000000), 0x08013046: struct.pack("<I", (F | 1) + 0x04000000)})
-        words, calls, branches = frame_r1.scan(rom, F)
+        words, calls, branches, adrs = frame_r1.scan(rom, F)
         # the address at every byte offset; each mirror (0x09-0x0D) at halfword offsets only; 0x0E is not ROM
         self.assertEqual([site for site, _ in words], [0x08013000, 0x08013006, 0x08013011, 0x08013016, 0x08013020,
                                                        0x0801303A, 0x08013040, 0x08013046])
         self.assertEqual(calls, [(CALLER + 2, F)])
-        self.assertEqual(branches, [])
+        self.assertEqual((branches, adrs), ([], []))
         # b F from 0x0800FFF0 (offset -0x14... forward +0xC) and a beq to it
         rom = bytearray(rom)
         struct.pack_into("<H", rom, NEIGHBOUR - match.ROM_BASE, 0xE000 | ((F - NEIGHBOUR - 4) >> 1))
         struct.pack_into("<H", rom, NEIGHBOUR + 2 - match.ROM_BASE, 0xD000 | ((F - NEIGHBOUR - 6) >> 1))
         self.assertEqual(frame_r1.scan(bytes(rom), F)[2], [(NEIGHBOUR, F), (NEIGHBOUR + 2, F)])
 
-    def test_the_gap_before_the_entry_is_scanned(self):
+    def test_adrs_and_the_gap_before_the_entry_are_scanned(self):
         rom, _ = image({F: [BX_LR]}, predecessor=False)
         rom = bytearray(rom)
-        struct.pack_into("<I", rom, 0x08013000 - match.ROM_BASE, (F - 2) | 1)
+        base = match.ROM_BASE
+        # Thumb ADR: add r0, pc, #imm8 * 4 from ((site + 4) & ~3); one names F, one F - 2's word, one is out of
+        # reach (it would need imm8 > 255)
+        struct.pack_into("<H", rom, F - 0x40 - base, 0xA000 | (F - ((F - 0x40 + 4) & ~3)) // 4)
+        struct.pack_into("<H", rom, F - 0x22 - base, 0xA100 | (F - 4 - ((F - 0x22 + 4) & ~3)) // 4)
+        struct.pack_into("<H", rom, F - 0x500 - base, 0xA0FF)
+        # ARM ADR: add r0, pc, #0x40 at F - 0x48, sub r0, pc, #0x40 at F + 0x38, both naming F; an add with
+        # Rn = r1 does not
+        struct.pack_into("<I", rom, F - 0x48 - base, 0xE28F0040)
+        struct.pack_into("<I", rom, F + 0x38 - base, 0xE24F0040)
+        struct.pack_into("<I", rom, F + 0x48 - base, 0xE2810000 | 0x40)
+        _, _, _, adrs = frame_r1.scan(bytes(rom), F)
+        self.assertEqual(adrs, [(F - 0x48, F), (F - 0x40, F), (F + 0x38, F)])
+        # with a gap [F - 4, F): its halfwords are targets too
+        _, _, _, adrs = frame_r1.scan(bytes(rom), F, F - 4)
+        self.assertEqual(adrs, [(F - 0x48, F), (F - 0x40, F), (F - 0x22, F - 4), (F + 0x38, F)])
+        struct.pack_into("<I", rom, 0x08013000 - base, (F - 2) | 1)
         self.assertEqual(frame_r1.scan(bytes(rom), F, F - 4)[0], [(0x08013000, F - 2)])
         self.assertEqual(frame_r1.scan(bytes(rom), F)[0], [])
 
@@ -123,6 +139,13 @@ class EvidenceTests(unittest.TestCase):
             "branch at 0x0800FF00 reaches the unmapped gap before it": (
                 {F - 0x100: [0xE000 | (((F - 2 - (F - 0x100) - 4) >> 1) & 0x7FF), BX_LR], F - 4: [BX_LR], F: [BX_LR],
                  CALLER: caller([MOVS_R1_0])}, None),
+            "ADR at 0x0800FFC2 forms the address of the function": (
+                {F - 0x40: [PUSH_LR, 0xA000 | (F - ((F - 0x40 + 2 + 4) & ~3)) // 4, 0x3001, F - 0x20, 0x1c08,
+                            0xbc02, 0x4708],
+                 F - 0x20: [BX_R0], F - 4: [0x2000, BX_LR], F: [BX_LR], CALLER: caller([MOVS_R1_0])}, None),
+            "ADR at 0x0800FFB8 forms the address of the function": (
+                {F - 4: [0x2000, BX_LR], F: [BX_LR], CALLER: caller([MOVS_R1_0])},
+                {F - 0x48: struct.pack("<I", 0xE28F0040)}),
             "78-byte unmapped gap before it is longer than 64 bytes": (
                 {F - 0x50: [BX_LR], F: [BX_LR], CALLER: caller([MOVS_R1_0])}, None),
         }
@@ -176,7 +199,7 @@ def frame():
 
 
 FOUND = dict(schema=frame_r1.SCHEMA, function=A, callers=[dict(site=0x08000502, caller=0x08000500, states=2,
-             body_sha256="0" * 64, kills=[0x08000506])], words=0, branches=0, previous=0x080001FE,
+             body_sha256="0" * 64, kills=[0x08000506])], words=0, branches=0, adrs=0, previous=0x080001FE,
              previous_end=A, gap=0, premise=frame_r1.PREMISE, premise_proved=False)
 
 
@@ -343,6 +366,14 @@ class FrameResultR1NativeTests(unittest.TestCase):
         (line,) = [line for line in report.splitlines() if line.startswith(frame_r1.LINE)]
         self.assertIn("the mapped function before it, 0x080001F8, has a closed control-flow graph and nothing "
                       "names the 4-byte unmapped gap from 0x080001FC to the entry", line)
+
+    def test_an_adr_naming_the_owner_refuses(self):
+        # add r0, pc, #0xFC at 0x08000100 forms 0x08000200
+        root = self.fixture("adr", "movs r1, #0\n", extra=((0x08000100, [0xA000 | (A - 0x08000104) // 4]),))
+        code, output, report = run(root)
+        self.assertNotEqual(code, 0, output)
+        self.assertIsNone(report)
+        self.assertIn("(R1: the ADR at 0x08000100 forms the address of the function)", output)
 
     def test_an_owner_whose_caller_reads_r1_refuses(self):
         root = self.fixture("read", "adds r0, r1, #0\n")
