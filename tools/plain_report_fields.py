@@ -21,6 +21,8 @@ admits exactly the lines the writer produces for the claimed schema:
    block exactly, right after the stack-frame line, and so may the
    `* stack frame exit scratch` lines (kit #538), which
    `match_evidence.legacy_report_control_flow` holds to the recomputed lines.
+   On the framed schemas the root walk's `* far jumps:` line (far_jump_profile)
+   may appear once, after the stack-frame lines; replay re-renders it.
    On the call schemas the `* callee-saved premise:` and `* callee-saved fact:`
    lines (kit #350) may repeat too, and replay requires them to equal the
    recomputed lines the same way;
@@ -61,6 +63,7 @@ COMMON = ("* source: ", "* verification: ", "* source SHA-256: ", "* compiler: "
           "* verified extent: ", "* relocations: ", "* ROM bytes: ", "* compiled : ",
           "* source plausibility: ", "* hand-asm allow list: ")
 FRAME = ("* stack frame: ",)
+FAR_JUMPS = ("* far jumps: ",)    # far_jump_profile: the root walk's far jumps (framed code only)
 CALLS = ("* mapping SHA-256: ", "* control flow: ")
 DATA = ("* data symbols SHA-256: ",)
 BUFFER = ("* buffer calls: ", "* buffer proof SHA-256: ")
@@ -72,7 +75,7 @@ UNIT = ("* library unit: ", "* unit toolchain: ", "* unit compiler SHA-256: ", "
 HAND_ASM = re.compile(r"not listed|listed \(.*\)")
 
 # The writer's field order (match.py's report writer); the buffer proof lines follow their fingerprint.
-ORDER = (COMMON[:3] + FRAME + (DMA_FILL_LINES, EXIT_SCRATCH_LINES) + BUFFER + (PROOF_LINES, PREMISES) + CALLS +
+ORDER = (COMMON[:3] + FRAME + (DMA_FILL_LINES, EXIT_SCRATCH_LINES) + FAR_JUMPS + BUFFER + (PROOF_LINES, PREMISES) + CALLS +
          SELF_CALLS + DATA + UNIT + COMMON[3:])
 
 
@@ -94,7 +97,7 @@ def layout(schema):
     framed, calls, data, buffer = shapes[schema]
     required = COMMON + (FRAME if framed else ()) + (CALLS if calls else ()) + \
         (DATA if data else ()) + (BUFFER if buffer else ())
-    optional = UNIT + (SELF_CALLS if calls and not buffer else ())
+    optional = UNIT + (SELF_CALLS if calls and not buffer else ()) + (FAR_JUMPS if framed else ())
     return required, optional, ((PROOF_LINES,) if buffer else ()) + \
         ((DMA_FILL_LINES, EXIT_SCRATCH_LINES) if framed and not buffer else ()) + ((PREMISES,) if calls else ())
 

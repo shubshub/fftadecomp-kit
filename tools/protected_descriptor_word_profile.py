@@ -1,4 +1,5 @@
 """Exact live stack words within the existing buffer and canonical-call engine."""
+import far_jump_profile as far_jump
 import json
 
 import match
@@ -68,7 +69,8 @@ class ProtectedDescriptorWordProof(callback.StaticCallbackBufferProof):
                 if item.cc not in (match.ARM_CC_AL, match.ARM_CC_INVALID):
                     successors += (site+item.size,)
             else:
-                successors = (site+item.size,)
+                # A far jump the walk took goes to its target (far_jump_profile).
+                successors = far_jump.successors(item)
             pending.extend((target, shrunk) for target in successors)
 
     def inspect(self, address, data):

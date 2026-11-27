@@ -25,13 +25,17 @@ import test_addressed_signed_runtime_thunks as fixtures
 
 match, profile, evidence, status = fixtures.match, fixtures.profile, fixtures.evidence, fixtures.status
 import signed_remainder_leaf_profile as remainder_leaf
+import far_jump_profile as far_jump
 A, B, R2, R3 = fixtures.A, fixtures.B, fixtures.R2, fixtures.R3
 SELECTOR, SCHEMA = profile.COMPILER_THUNKS_DATA_SELECTOR, profile.COMPILER_THUNKS_DATA_SCHEMA
 POLICY = profile.COMPILER_THUNKS_POLICY
 PLAIN = 'signed quotient excludes other runtime, literal, switch and thunk profiles'
 # The default path's division leaf retry (signed_remainder_leaf_profile.DIVISION) also runs on PLAIN,
 # after the route; its walk refuses the thunk owner, and the earlier refusals stay first.
-LEAF = remainder_leaf.DIVISION_RETRY + 'call is not a validated external direct Thumb BL'
+# The leaf retry walks the fixture's far jumps (far_jump_profile) and refuses after them; without
+# that rule it refuses at the first one (FAR_JUMP_LEAF).
+LEAF = remainder_leaf.DIVISION_RETRY + 'software-double remainder runtime instruction count differs'
+FAR_JUMP_LEAF = remainder_leaf.DIVISION_RETRY + 'call is not a validated external direct Thumb BL'
 
 # fixtures.TABLE with the compiler's own `%` and `/` in place of the explicit runtime calls.
 TABLE = fixtures.TABLE.replace('s32 func_08142950(s32 numerator, s32 denominator);\n', '').replace(
@@ -201,6 +205,8 @@ class CompilerRuntimeThunkTests(unittest.TestCase):
         root = self.copy_root(self.table)
         with patch.object(POLICY, 'enabled', False):
             self.assertEqual(self.main(root), (f'compile failed:\n{PLAIN}{LEAF}', self.main(root)[1]))
+            with patch.object(far_jump.POLICY, 'enabled', False):
+                self.assertEqual(self.main(root)[0], f'compile failed:\n{PLAIN}{FAR_JUMP_LEAF}')
             with patch.object(remainder_leaf.DIVISION, 'enabled', False):
                 self.assertEqual(self.main(root), (f'compile failed:\n{PLAIN}', self.main(root)[1]))
         for options in (('--function-address-profile', 'canonical-thunks-v1'),
