@@ -189,6 +189,7 @@ def word_memory(proof, instruction, aliases, constants, stack, words, sp_offset,
 def _cyclic_sites(instructions):
     """The owner sites on a cycle of its control flow; every site when it has an indirect jump."""
     import match
+    import far_jump_profile as far_jump
     by_address = {item.address: item for item in instructions}
     successors = {}
     for site, item in by_address.items():
@@ -199,11 +200,11 @@ def _cyclic_sites(instructions):
             successors[site] = (item.operands[0].imm,) + (
                 (site + item.size,) if item.cc not in (match.ARM_CC_AL, match.ARM_CC_INVALID) else ())
         elif match.CS_GRP_CALL in item.groups:
-            successors[site] = (site + item.size,)
+            successors[site] = far_jump.successors(item)     # a far jump the walk took: its target only
         elif match.ARM_REG_PC in item.regs_access()[1]:
             return set(by_address)          # an owner switch or other indirect jump: no exact CFG
         else:
-            successors[site] = (site + item.size,)
+            successors[site] = far_jump.successors(item)
     cyclic = set()
     for start in by_address:
         pending, seen = list(successors[start]), set()

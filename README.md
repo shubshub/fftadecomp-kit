@@ -1290,7 +1290,9 @@ provenance; it does not certify the callee's behavior or whole-program return.
 
 Unmapped data relocations, cross-mode/ARM calls, `BLX`, indirect calls, local
 helper functions, intra-function and non-entry calls, tail calls, linker veneers
-and extra allocated sections remain unsupported. These cases fail closed rather
+and extra allocated sections remain unsupported (agbcc's far jump, a `bl` used
+as a branch inside the function, is not a call: see "Far jumps on the default
+path" below). These cases fail closed rather
 than receiving a partial match. Existing relocation-free leaf functions retain
 their original verification profile.
 
@@ -1485,6 +1487,70 @@ the clean ones) are reported by `match.py` on the command line as
 `refused: <reason>` (`error (<type>): <reason>` for any other `ValueError`)
 with status 1, not as a traceback. `FFTA_TRACEBACK=1` restores the traceback
 (unset, empty and `0` leave it off).
+
+#### Far jumps on the default path
+
+agbcc emits `bl .Ln` to a label of the function it compiles when a branch is
+beyond the reach of a Thumb `b` (its far-jump pattern, which also makes the
+prologue save LR). By ARMv4T the pair is then a jump: PC becomes its target and
+LR the address after the pair, and no other register, flag or memory changes.
+The default path's walks used to refuse every such pair (`call is not a
+validated external direct Thumb BL`). `tools/far_jump_profile.py`
+(`thumb-same-owner-far-jump-v1`) walks it as a jump when:
+
+* the walk is a default one: `verify_leaf_instructions` gets no argument but
+  the plain path's (data, address, mode, the linked calls or the call
+  resolver, the buffer proof, narrow reads, DMA fills, the callee watch, exit
+  scratch, entry call-target facts and runtime summaries), and its buffer
+  proof, and the proof whose resolver a callee walk uses, is none,
+  `BufferCallProof` or `FunctionBufferCallProof`. Their stack-index and
+  closure-slot retries and the callees they inspect are default walks. Every
+  other context keeps its own rule or refusal: the menu list, the owner
+  switch's far default arm, the software double, the outgoing-argument switch
+  frame and the addressed runtime keep theirs, and the opt-in profiles refuse;
+* it is the canonical unconditional four-byte pair and its target is an even
+  address strictly inside the function (`entry < target < end`); a target at
+  the entry is a self call and one at the end leaves the function. The walk
+  then decodes the target as a reachable instruction, so a target inside
+  another instruction or on a literal word refuses as before;
+* the site has no call binding: a relocated `bl` stays a call.
+
+The walk takes the target as the only successor, drops LR's return provenance,
+alias and constant, and keeps every other register, the flags and the frame.
+After the walk, every path from each far jump's target must write LR (a `bl`,
+or a pop, load or move into LR) before any instruction reads it: `far jump:
+the continuation in LR is read at ...` otherwise, so no code sees the
+continuation (a push of LR, a copy, `bx lr`). Returns are proved as before: only
+through a register or saved word holding the entry LR, with the frame balanced,
+exactly as after an external `bl`, which destroys LR too. No frame value
+crosses a call (there is none), and no possible frame address becomes a
+scalar. There is no premise.
+
+Every analysis that recomputes control flow over a walked function takes its
+successors for a non-branch instruction from one rule, `far_jump_profile.successors`
+(and `raw_successors` for the raw-halfword stack-index analysis): a far jump the
+walk took goes to its target only, anything else falls through. That covers the
+callee argument walk of the buffer proofs, the descriptor-word lifetime check
+(K5, for the closure-slot owner and every callee it walks), the closure-slot
+loop check (K3) and the stack-index retry's analysis, whose CFG must equal the
+verified one. `tests/test_far_jumps.py` (`SuccessorSiteTests`) enumerates every
+kit function that builds Thumb successors, classifies each (the shared rule, the
+walks that decide the jumps, walks that treat every same-function BL as a jump
+by their own check, ones that refuse at any BL, pinned runtime bodies, and
+selector-only code), and runs the default routes with far jumps under a profiler
+to check that none of the selector-only ones is reached; a new successor
+computation fails the test until it is classified.
+
+A report whose root walk took a far jump gains, after the stack-frame lines,
+`* far jumps: thumb-same-owner-far-jump-v1 <summary>: +0xSITE->+0xTARGET, ...`
+(offsets from the entry), re-derived from the verified instructions by issuance
+and replay. A callee's far jumps are bound into the buffer proof fingerprint
+and stated as `* buffer far jumps: thumb-same-owner-far-jump-v1 callee
+0x<ADDR>: ...`. Reports without a far jump are unchanged.
+`tests/test_far_jumps.py` covers each condition and refusal on assembled bodies
+and the default routes end to end with natural C: the plain stack-buffer walk,
+the typed-data walk, the stack-index retry and walked callees on the plain and
+function-literal routes.
 
 ### Bounded register buffer calls
 

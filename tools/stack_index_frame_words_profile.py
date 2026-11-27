@@ -654,6 +654,13 @@ class FrameWordsAnalysis(sip.Analysis):
             offset = ((raw & 0x7FF) << 12) | ((second & 0x7FF) << 1)
             target = site + 4 + (offset - 0x800000 if offset & 0x400000 else offset)
             state = state.copy()
+            if site in self.far_jumps:
+                # X1: a far jump the core walked changes PC and LR only (no callee, no clobber).
+                outgoing = super().step(state, site)
+                for _, after in outgoing:
+                    after.ids[14] = None
+                    after.mirrors = tuple(pair for pair in after.mirrors if pair[0] != 14)
+                return outgoing
             surviving = self.callee(state, site, target) if not self.address <= target < self.end else []
             outgoing = super().step(state, site)
             for _, after in outgoing:

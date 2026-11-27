@@ -388,6 +388,8 @@ FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* 
           "* buffer call-via target", "* buffer call-via premise",
           # closure_slot_profile.lines
           "* buffer closure slot",
+          # far_jump_profile: the root's line (match.render_report) and an inspected callee's
+          "* far jumps", "* buffer far jumps",
           # function_literal_exit_scratch_profile.lines
           "* buffer function-literal exit scratch", "* buffer frame exit scratch", "* buffer frame result r1",
           # default_stack_index_profile.lines

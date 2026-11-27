@@ -281,7 +281,10 @@ class Policy:
                               returned={site: {register: frozenset(offsets)
                                                for register, offsets in found.items()}
                                         for site, found in self.returned.items()},
-                              callee_watch=self.callee_watch)
+                              callee_watch=self.callee_watch,
+                              far_jumps={instruction.address: instruction.far_jump_target
+                                         for instruction in instructions
+                                         if getattr(instruction, "far_jump_target", None) is not None})
         return self.evidence
 
 
@@ -590,6 +593,8 @@ class Analysis:
         self.check = False
         self.switch_site = None
         self.switch_edges = ()
+        # X1 (far_jump_profile): the far jumps the core walk took, site -> target; set by prove_words.
+        self.far_jumps = {}
         thresholds = {0, MASK}
         for bit in range(33):
             thresholds.update({(1 << bit) - 1, min(MASK, 1 << bit)})
@@ -893,6 +898,11 @@ class Analysis:
                 offset -= 0x800000
             target = site + 4 + offset
             if self.address <= target < self.end:
+                if self.far_jumps.get(site) == target:
+                    # A far jump the core walked: PC := target, LR := its continuation; nothing else changes.
+                    state.regs[14] = TOP
+                    state.exprs[14] = None
+                    return [(target, state)]
                 refuse("same-owner long branches are outside this policy")
             # R12 is call-clobbered, so the analysis cannot know its value after the call,
             # yet a callee need not write it: an address held there could survive the call
@@ -1165,7 +1175,8 @@ class Analysis:
             return self.switch_edges
         raw = self.halfword(site)
         if raw & 0xF800 == 0xF000:
-            return (site + 4,)
+            import far_jump_profile as far_jump
+            return far_jump.raw_successors(site, self.far_jumps)
         if raw & 0xF000 == 0xD000:
             displacement = raw & 0xFF
             return (site + 4 + 2 * (displacement - 256 if displacement & 0x80 else displacement), site + 2)
@@ -1269,7 +1280,7 @@ def forwarding_evidence(analysis, forwarding):
         if site in forwarding["walked"]:
             refuse("the owner passes stack pointers to a callee after a callee released a "
                    "forwarded pointer word")
-        if raw & 0xF800 == 0xF000:
+        if raw & 0xF800 == 0xF000 and site not in analysis.far_jumps:
             offset = ((raw & 0x7FF) << 12) | ((analysis.halfword(site + 2) & 0x7FF) << 1)
             trusted.append([site, site + 4 + (offset - 0x800000 if offset & 0x400000 else offset)])
     return {"slots": forwarding["slots"], "released": releases, "trusted_calls": trusted,
@@ -1292,11 +1303,12 @@ def forwarded_lines(evidence):
 
 def prove(data, address, verified_sites, derivations, accesses, copies, *, selector=SELECTOR,
           forwarding=None, spills=frozenset(), callee_span=None, returned=None, callee_watch=None,
-          carry_callee_saved=True):
+          carry_callee_saved=True, far_jumps=None):
     import stack_index_frame_words_profile as frame_words
     # The #350 callee walk checks each call either analysis makes.
     return frame_words.prove(functools.partial(prove_words, callee_watch=callee_watch,
-                                               carry_callee_saved=carry_callee_saved), data, address,
+                                               carry_callee_saved=carry_callee_saved,
+                                               far_jumps=far_jumps), data, address,
                              verified_sites, derivations, accesses, copies,
                              selector=selector, forwarding=forwarding, spills=spills,
                              callee_span=callee_span, returned=returned or {})
@@ -1304,7 +1316,7 @@ def prove(data, address, verified_sites, derivations, accesses, copies, *, selec
 
 def prove_words(data, address, verified_sites, derivations, accesses, copies, *, selector=SELECTOR,
                 forwarding=None, analysis_type=None, leaf_switch=None, callee_watch=None,
-                carry_callee_saved=True):
+                carry_callee_saved=True, far_jumps=None):
     """One analysis; ``analysis_type`` (frame words) replaces the plain one when given."""
     from scroll_wave_table_index import OWNER, ScrollWaveAnalysis
     scroll_wave = address == OWNER and selector == SELECTOR and analysis_type is None
@@ -1314,6 +1326,10 @@ def prove_words(data, address, verified_sites, derivations, accesses, copies, *,
                                            callee_watch=callee_watch)
     if not carry_callee_saved:
         analysis.carry_callee_saved = False
+    if far_jumps:
+        if leaf_switch is not None:
+            refuse("far jumps exclude the bounded-index leaf switch")
+        analysis.far_jumps = dict(far_jumps)
     if leaf_switch is not None:
         from owner_switch_buffer_profile import OwnerSwitch
         if (type(leaf_switch) is not OwnerSwitch or selector != SELECTOR_V2 or analysis_type is not None

@@ -456,6 +456,7 @@ def closed_report(report, root, address, parts):
     entry outright.
     """
     from match import ROM_BASE, render_report, report_listing, uses_stack_frame
+    import far_jump_profile as far_jump
     try:
         parts = dict(parts)
         data, instructions = parts.pop("data"), parts.pop("instructions")
@@ -472,7 +473,8 @@ def closed_report(report, root, address, parts):
             addr=address, src_rel=report_source(root, address), fingerprint=source_fingerprint(root, address),
             compiler=compiler, want=want, span=len(data), got_body=data, verdict="MATCH - byte identical",
             same_bytes=len(data), listing=listing, framed_profile=thumb and uses_stack_frame(instructions),
-            unit_context=unit_context, unit_orphan=unit_orphan, **parts) == report
+            unit_context=unit_context, unit_orphan=unit_orphan, far_jumps=far_jump.record(instructions, address),
+            **parts) == report
     except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError,
             RuntimeError, subprocess.SubprocessError):
         return False

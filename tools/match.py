@@ -62,6 +62,7 @@ import owner_switch_buffer_profile as owner_switch_buffer
 import dma_fill_profile as dma_fill
 import forwarded_slot_profile as forwarded_slots_profile
 import dma_fill_premise
+import far_jump_profile as far_jump
 import return_scratch_profile as return_scratch_profile
 import empty_body_profile as empty_body
 import library_units
@@ -3864,6 +3865,7 @@ class BufferCallProof:
         if not isinstance(self.entries, list):
             raise ValueError("buffer calls require a function mapping")
         self.dependencies = {}
+        self.far_jumps = {}           # X1: an inspected callee's far jumps (far_jump_profile.observe)
         self.active = set()
         self.stack_arguments = stack_arguments
         self.loop_replays = {}
@@ -4010,6 +4012,7 @@ class BufferCallProof:
                                                 buffer_proof=self if self.stack_arguments else None,
                                                 call_resolver=self.resolve_call,
                                                 runtime_summaries=self.runtime_summaries, **entry)
+        far_jump.observe(self, address, instructions)
         if closure.active(self):
             # K5: no walked callee allocates frame after releasing it (the selector's lifetime check).
             closure.check_lifetime(self, data, address, instructions)
@@ -4040,7 +4043,8 @@ class BufferCallProof:
     def _snapshot_ledgers(self):
         """Every ledger an inspection writes, so an aborted or replaced pass leaves no record."""
         return (({callee: set(records) for callee, records in self.loop_replays.items()},
-                 dict(self.dependencies), dict(self.callee_clobbers), dict(self.callee_trusted)),
+                 dict(self.dependencies), dict(self.callee_clobbers), dict(self.callee_trusted),
+                 dict(self.far_jumps)),
                 self.bios_summaries.copy() if self.bios_summaries is not None else None,
                 None if self.copy_summaries is None else
                 (dict(self.copy_summaries.contracts), dict(self.copy_summaries.observations)),
@@ -4078,8 +4082,8 @@ class BufferCallProof:
         self.call_via_records.update(via_snapshot[0])
         self.call_via_effective.clear()
         self.call_via_effective.update(via_snapshot[1])
-        for ledger, values in zip((self.loop_replays, self.dependencies, self.callee_clobbers, self.callee_trusted),
-                                  snapshot):
+        for ledger, values in zip((self.loop_replays, self.dependencies, self.callee_clobbers, self.callee_trusted,
+                                   self.far_jumps), snapshot):
             ledger.clear()
             ledger.update(values)
         if bios_snapshot is not None:
@@ -4248,6 +4252,11 @@ class BufferCallProof:
                             stack[:0] = [(False, False, True)] * -adjustment
                         else:
                             del stack[:adjustment]
+                elif getattr(instruction, "far_jump_target", None) is not None:
+                    # X1 (far_jump_profile): a far jump the callee's core walk took writes PC and LR
+                    # only; no callee, no clobber.
+                    aliases.pop(ARM_REG_LR, None)
+                    constants.pop(ARM_REG_LR, None)
                 elif CS_GRP_CALL in instruction.groups:
                     passed = {register: offset for register, offset in aliases.items()
                               if register in CALLER_CLOBBERED}
@@ -4453,7 +4462,8 @@ class BufferCallProof:
                         else:
                             successors += (current + instruction.size,)
                 else:
-                    successors = (current + instruction.size,)
+                    # A far jump the callee's walk took goes to its target (far_jump_profile).
+                    successors = far_jump.successors(instruction)
                 if self.callee_frames:
                     if len(stack) * 4 > 4096 or frame_base - 4 * depth != -4 * len(stack):
                         raise ValueError("callee live stack exceeds its exact bounded frame")
@@ -4726,6 +4736,7 @@ class BufferCallProof:
         lines.extend(closure.lines(self))
         lines.extend(function_exit.lines(self))
         lines.extend(forwarded_slots_profile.lines(self))
+        lines.extend(far_jump.lines(self))
         return lines
 
     def record_cursor_loops(self, records):
@@ -4767,6 +4778,11 @@ class BufferCallProof:
             # Bound only when a default proof forwarded a slot: other reports keep their fingerprint.
             digest.update(len(forwarded).to_bytes(8, "little"))
             digest.update(forwarded)
+        jumps = far_jump.fingerprint_payload(self)
+        if jumps is not None:
+            # Bound only when an inspected callee took a far jump: other reports keep their fingerprint.
+            digest.update(len(jumps).to_bytes(8, "little"))
+            digest.update(jumps)
         scratch = function_exit.fingerprint_payload(self)
         if scratch is not None:
             # Bound only when a function-literal owner dropped exit scratch: other reports keep theirs.
@@ -4996,6 +5012,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 value is not None and value is not False
                 for name, value in locals().items() if name not in SELF_CALL_PARAMETERS):
             raise ValueError("self calls require the plain direct-call path and a nonempty site set")
+    # X1 (far_jump_profile): agbcc far jumps, on the default path's walks only.
+    far_jump_walk = far_jump.default_walk(locals(), VERIFY_LEAF_PARAMETERS)
     if type(switch_interposed_pool) is not bool or switch_interposed_pool and (
             switch_relocations is None or switch_data_relocations is None or
             preloaded_switch or allow_switch_constants or allow_switch_scalar_frame or
@@ -5522,6 +5540,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     calls = dict(validated_calls or {})
     seen_calls = set()
     local_branches = {}
+    far_jumps = set()
     literal_adjustments = set()
     shifted_stack_constants = set()
     literal_stack_constants = set()
@@ -5611,6 +5630,11 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                                      addressed_signed_runtime.local_branches(addressed_signed_runtime_context)) and
                         len(operands) == 1 and operands[0].type == ARM_OP_IMM and
                         address <= operands[0].imm < end)
+        if not local_branch and calling and far_jump_walk and \
+                far_jump.target(instruction, address, end, calls) is not None:
+            far_jumps.add(current)
+            far_jump.mark(instruction)
+            local_branch = True
         if local_branch:
             from local_long_branch_profile import target as local_target
             local_branches[current] = local_target(instruction, address, end)
@@ -6439,6 +6463,12 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         # any external BL.
         if local_branches != owner_switch_branches:
             raise ValueError("owner switch walk took a local BL other than its far default arm")
+    elif far_jumps:
+        # X1: the walk proved every return from the entry LR with a balanced frame, as after any
+        # external BL; what is left is that no path reads the continuation a far jump left in LR.
+        if set(local_branches) != far_jumps:
+            raise ValueError("far jumps combine with no other local-branch context")
+        far_jump.check_dead(instructions, edges, local_branches)
     elif local_branches:
         from local_long_branch_profile import prove_frame
         prove_frame(instructions, edges, address, local_branches, calls)
@@ -6466,6 +6496,10 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     if cursor_records:
         buffer_proof.record_cursor_loops(cursor_records)
     return [instructions[current] for current in sorted(instructions)]
+
+
+VERIFY_LEAF_PARAMETERS = frozenset(verify_leaf_instructions.__code__.co_varnames[
+    :verify_leaf_instructions.__code__.co_argcount + verify_leaf_instructions.__code__.co_kwonlyargcount])
 
 
 def verify_leaf(data, address, thumb):
@@ -6629,7 +6663,8 @@ def render_report(*, addr, src_rel, schema, fingerprint, compiler, want, span, g
                   remainder_evidence=None, quotient_evidence=None, signed_quotient_profile=None,
                   spin_profile=False, spin_evidence=None, function_index=None, double_profile=False,
                   double_evidence=None, thunk_profile=False, function_address_profile=None,
-                  thunk_evidence=None, unit_context=None, unit_orphan=None, dma_lines=(), scratch_lines=()):
+                  thunk_evidence=None, unit_context=None, unit_orphan=None, dma_lines=(), scratch_lines=(),
+                  far_jumps=()):
     """The complete text of a match report.
 
     match.py writes exactly this (or, with --check-report, compares it with
@@ -6666,6 +6701,9 @@ def render_report(*, addr, src_rel, schema, fingerprint, compiler, want, span, g
         raise ValueError("exit scratch lines require the stack-frame line")
     for line in scratch_lines:
         out.append(line + "\n")
+    if far_jumps:
+        # X1: the root walk's far jumps (far_jump_profile), from its verified instructions.
+        out.append(far_jump.report_line(far_jumps) + "\n")
     if buffer_proof is not None and buffer_proof.buffer_evidence():
         summary = STACK_BUFFER_SUMMARY if buffer_proof.stack_arguments else BUFFER_SUMMARY
         out.append(f"* buffer calls: {summary}\n")
@@ -7950,7 +7988,8 @@ def main():
             function_address_profile=args.function_address_profile, thunk_evidence=thunk_evidence,
             unit_context=unit_context, unit_orphan=unit_orphan,
             dma_lines=dma_fills.report_lines() if dma_fills is not None else (),
-            scratch_lines=return_scratch.report_lines() if return_scratch is not None else ())
+            scratch_lines=return_scratch.report_lines() if return_scratch is not None else (),
+            far_jumps=far_jump.record(verified_instructions, addr))
         if args.check_report:
             # what status.py --verify requires of a MATCH: the saved report is exactly the one this run
             # would write (a source that does not match keeps its verdict and compares nothing)
