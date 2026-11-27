@@ -261,15 +261,6 @@ class RtlTests(unittest.TestCase):
             with self.subTest(label=label_), self.assertRaisesRegex(proof.ProofError, reason):
                 fill.fills(function(insns))
 
-    def test_a_removal_keeps_only_stores_the_function_makes(self):
-        a, b, moved = (18, -2, 2), (18, -4, 2), (18, -6, 2)
-        self.assertEqual(fill.account([a, b], Counter([b]), 1, 5), Counter([a]))
-        for label, left, reach in (("a store moved", Counter([b, moved]), 1),
-                                   ("too few removed", Counter([a, b]), 1),
-                                   ("too many removed", Counter(), 1)):
-            with self.subTest(label=label), self.assertRaisesRegex(proof.ProofError, "line 5 does not account"):
-                fill.account([a, b], left, reach, 5)
-
     def test_a_value_read_from_the_frame_is_no_frame_address(self):
         # a fifth argument, read from the incoming arguments and compared: its value addresses no slot
         argument = [(3, "insn (set (reg:SI 23) (mem/f:SI (reg:SI 17 virtual-incoming-args) 0)) -1 (nil) (nil)"),
@@ -843,13 +834,16 @@ class CompiledTests(unittest.TestCase):
                     self.assertRaisesRegex(proof.ProofError, "passes r1 an address that reaches"):
                 self.run_fill(head + f"void func_08000400(u16 *dest) {{ CpuFill16(0, {dest}, 0x40); }}\n")
 
-    def test_a_removal_that_moves_another_fill_refuses(self):
-        # without the word's qualifier the halfword fill moves from sp+4 to sp+0, a store the function does not make
+    def test_a_removal_that_moves_another_fill_is_accounted(self):
+        # without the word's qualifier the halfword fill moves from sp+4 to sp+0, keeping its volatile store: the
+        # fills pair by call order, so the word's group accounts for exactly its own fill.  The proof then reaches
+        # the halfword's group, whose qualifier changes nothing (the store stays, its address escapes)
         word = ("void func_08000400(u16 *dest) {\n    {\n        volatile u32 tmp = 0;\n"
                 "        func_0814186C((const void *)&tmp, dest, 0x05000010);\n    }\n"
                 "    {\n        volatile u16 tmp = 0;\n"
                 "        func_0814186C((const void *)&tmp, dest + 0x40, 0x01000010);\n    }\n}\n")
-        with self.assertRaisesRegex(proof.ProofError, "line 7 does not account for its volatile stores"):
+        with self.assertRaisesRegex(proof.ProofError, "removing the qualifiers of the fill at line 11 does not change "
+                                                      "the code"):
             self.run_fill(word)
 
     def test_a_fill_the_rom_does_not_show_refuses(self):

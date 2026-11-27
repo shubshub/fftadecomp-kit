@@ -6168,10 +6168,19 @@ function-like macro defined once, with `t` nowhere else. The unit is compiled
 as written and with each fill's tokens removed, with the volatile proof's
 exact census (a macro's tokens reach the unit once per use). The function
 must equal the ROM, the ROM's `func_0814186C` must be `swi 0x0B; bx lr` and
-its `func_08141868` `swi 0x0C; bx lr` wherever a fill calls them, removing a
-fill's tokens must change the code and remove as many volatile frame stores
-as the fill has uses, and those stores must be every volatile frame store of
-the function. In the expand RTL each fill is a call of one of them whose `r0`
+its `func_08141868` `swi 0x0C; bx lr` wherever a fill calls them, and
+removing a fill's tokens must change the code. The fills are then accounted
+one by one: the BIOS calls of the build without the tokens pair with the
+function's by call order, and any difference in their number, callee, control
+word, destination or kind of source refuses (a fill's own temporary may there
+be a local the expand pass has not yet placed in the frame, since gcc keeps a
+word in a pseudo while only its address is taken). Exactly as many of the
+function's fills as the tokens have uses lose their volatile store; every
+other fill keeps one of its width, at any offset (removing one qualifier may
+move another temporary: 0x08023FD0's first and fourth fills share a slot, which
+the fourth leaves without the first's qualifier); no other call gains one, and
+no volatile frame store lies outside a fill. The fills each fill's tokens
+take are disjoint and are all of the function's fills. In the expand RTL each fill is a call of one of them whose `r0`
 is a frame slot, whose `r2` is a constant with bit 24 (a fixed source) set,
 whose block holds the one volatile store to the slot, and whose `r1` and
 `r3`, when frame addresses, miss the slot (`r1` with every byte it is filled
