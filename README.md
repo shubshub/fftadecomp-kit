@@ -1984,7 +1984,11 @@ a call that marks no R2 (or R3) for its callee, because no release of that
 callee had been recorded yet, is noted, and a release recorded later for
 that callee and register refuses. A call in the core walk of an inspected
 callee is not noted, because that callee's alias-path walk makes the same
-call after its core walk. The value is never dropped, so no premise is
+call after its core walk. A call-via call the walk does not resolve is keyed
+by the target it can name without resolving it (the exact call-target fact
+in the thunk's register, else its strict value, as an indexed Thumb entry);
+a target nobody can name, such as a callback loaded from memory, keeps the
+ordinary trust in an unwalked indirect call. The value is never dropped, so no premise is
 stated. The records are stated on one
 `* buffer released scratch:` line and bound into the buffer fingerprint only
 when there is one. Synthetic boundaries are in `tests/test_released_scratch.py`.

@@ -4335,6 +4335,7 @@ class BufferCallProof:
                     if passed or nested:
                         # A walked call-via call with an exact target is that target's call.
                         callee = call_via.resolve(self, callee, constants, current) or callee
+                    released_callee = released_scratch.call_key(self, callee, constants, current)
                     result = self.check_arguments(callee, passed, stack, nested, protected,
                         constants=self.argument_constants(constants), site=current,
                         **self.word_context(words, frame_base-4*depth if frame_base is not None else None, root_frame,
@@ -4352,7 +4353,7 @@ class BufferCallProof:
                         result = self.import_stale_words(result, aliases, depth)
                     self.finish_call_constants(constants, result, site=current, target=callee)
                     aliases.update(result)
-                    released_scratch.after_call(self, callee, aliases)
+                    released_scratch.after_call(self, released_callee, aliases)
                     # An inspected callee's own writes to R4-R11 are not trusted
                     # to be restored; uninspected calls keep the ABI premise.
                     nested_clobbers = self.callee_clobbers.get(callee, ())
@@ -5962,11 +5963,15 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 checked_target = getattr(buffer_proof, "call_via_effective", {}).get(current, operands[0].imm)
                 callee_saved_watch.core_check(buffer_proof if buffer_proof is not None else callee_watch,
                                               address, current, checked_target, aliases, constants)
+            # The callee a release is keyed by (released_scratch_profile.call_key), named before the
+            # call's clobbers drop the thunk register's value.
+            released_target = released_scratch.call_key(
+                buffer_proof, getattr(buffer_proof, "call_via_effective", {}).get(current, operands[0].imm),
+                constants, current) if buffer_proof is not None else operands[0].imm
             return_registers.difference_update(caller_clobbered)
             for register in caller_clobbered:
                 constants.pop(register, None)
                 aliases.pop(register, None)
-            released_target = getattr(buffer_proof, "call_via_effective", {}).get(current, operands[0].imm)
             if buffer_proof is not None:
                 buffer_proof.finish_call_constants(constants, returned_aliases,
                                                    site=current, target=operands[0].imm)

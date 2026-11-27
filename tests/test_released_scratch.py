@@ -276,6 +276,26 @@ class ReleasedScratchTests(unittest.TestCase):
         proof = self.walk(body.replace("adds r0, r2, #0\n", ""))
         self.assertIn(self.x(), {row[0] for row in proof.released_scratch})
 
+    def test_an_unresolved_call_via_call_is_keyed_by_the_target_it_names(self):
+        # rv-137's b8: a call through _call_via_r3 with nothing passed is not resolved, but its target
+        # is named by the literal's call-target fact, so the order of the two calls of D does not decide.
+        self.thunk = match.RUNTIME_HELPERS["_call_via_r3"]
+        via = f"ldr r3, =func_D + 1\nbl 0x{self.thunk:08X}\n"
+        use = "adds r0, r2, #0\nmovs r1, #0\nbl func_E\n"
+        walked = "mov r0, sp\nbl func_D\nmovs r2, #0\n"
+        frame = "push {r4, lr}\nsub sp, #8\n{}add sp, #8\npop {r4}\npop {r1}\nbx r1"
+        self.refused(r"an earlier call to 0x[0-9A-F]{8} took no marker", frame.replace("{}", via + use + walked))
+        self.refused("released callee frame address in r2 is read", frame.replace("{}", walked + via + use))
+        # The same inside a walked callee's alias-path walk (rv-137's b8b).
+        branch = (f"push {{lr}}\ncmp r1, #0\nbeq 1f\nmovs r0, #0\n{via}{use}b 2f\n1:\nbl func_D\nmovs r2, #0\n"
+                  "2:\npop {r0}\nbx r0\n.align 2\n.ltorg")
+        self.refused(r"an earlier call to 0x[0-9A-F]{8} took no marker", owner("movs r2, #0", callee="func_HB"),
+                     func_HB=branch)
+        # A target nobody can name (loaded from memory) keeps the trust in an unwalked indirect call.
+        unnamed = f"ldr r3, =0x02003000\nldr r3, [r3]\nbl 0x{self.thunk:08X}\n"
+        proof = self.walk(frame.replace("{}", unnamed + use + walked))
+        self.assertIn((self.thunk, 2), proof.released_unmarked)
+
     def test_a_call_whose_callee_overwrites_the_marked_register_unread(self):
         proof = self.walk(owner("bl func_K\nadds r0, r2, #0"))
         (key, entry), = proof.released_calls.items()
