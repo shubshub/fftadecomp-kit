@@ -6026,7 +6026,8 @@ after `mov lr, pc` or a lone BL prefix, either of which can make the next
 halfword a return address), and no BL, branch, return or word enters the pool
 up to it. That is all it proves, so the record prints each one with the premise that
 nothing the scan does not model runs it: an address formed by arithmetic, a
-lone BL suffix (a branch relative to `lr`), a copy in RAM, or ARM code. Each
+lone BL prefix elsewhere (which sets `lr`) or a lone BL suffix (a branch
+relative to `lr`), a copy in RAM, or ARM code. Each
 BL to the start must lie in an indexed function below `0x08150000` with a
 matched source whose BL relocation there names the function; that
 caller is compiled, must match the ROM, every call of the function in its

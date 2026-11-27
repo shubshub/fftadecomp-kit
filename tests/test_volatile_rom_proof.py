@@ -1640,7 +1640,7 @@ class CallerTests(unittest.TestCase):
         self.assertIn("; 08000480, a branch to 08000402 if it ran, is literal data no modelled reference reaches: the "
                       "word 08000480 is loaded by 08000470, its pool from 08000480 follows 0800047E, which never goes "
                       "on, and no BL, branch, return or word enters 08000480..08000481; unproved, so assumed: nothing "
-                      "the scan does not model runs it (an address formed by arithmetic, a lone BL suffix, a copy in "
+                      "the scan does not model runs it (an address formed by arithmetic, a lone BL prefix or suffix, a copy in "
                       "RAM, ARM code)", text)
         (state, text), = [verdict for _, verdict in self.trace(sources, literal(0x2000))]
         self.assertEqual(state, "refused", text)
