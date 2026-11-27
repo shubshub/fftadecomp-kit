@@ -376,6 +376,9 @@ FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* 
           "* buffer forwarded slots", "* buffer forwarded slot premise",
           # store_bound_premise_profile.lines
           "* buffer store bound", "* buffer store bound row", "* buffer store bound premise",
+          # motion_wrapper_summary_profile.MotionSummaries.lines
+          "* buffer motion wrapper", "* buffer motion wrapper facts", "* buffer motion wrapper site",
+          "* buffer motion wrapper premise",
           "* data symbols SHA-256", "* data buffer calls", "* data buffer manifest",
           "* data buffer proof SHA-256", "* compiler", "* verified extent", "* relocations",
           "* ROM bytes", "* compiled ", "* source plausibility", "* hand-asm allow list",
