@@ -40,6 +40,7 @@ import struct
 import sys
 import tempfile
 
+import readonly_initializer_profile as readonly
 import rom_mirror
 from menu_list_frame import MenuListFrame, ADDRESS as MENU_LIST_ADDRESS
 
@@ -141,8 +142,9 @@ def fingerprint(schema, address, data, manifest, source_digest, mapping, objects
 
 def report_lines(schema, address, data, manifest, source_digest, mapping, objects, buffer_digest):
     return [calls_field(schema) + SUMMARIES[schema],
-            f"{MANIFEST_FIELD}`{manifest_text(manifest)}`",
-            f"{PROOF_FIELD}`{fingerprint(schema, address, data, manifest, source_digest, mapping, objects, buffer_digest)}`"]
+            f"{MANIFEST_FIELD}`{manifest_text(manifest)}`"] + \
+        ([readonly.report_line(manifest[readonly.MANIFEST_KEY])] if readonly.MANIFEST_KEY in manifest else []) + \
+        [f"{PROOF_FIELD}`{fingerprint(schema, address, data, manifest, source_digest, mapping, objects, buffer_digest)}`"]
 
 
 def call_name(target):
@@ -186,7 +188,7 @@ def numeric_hardware(data, address, mapping, instructions, calls, words, remaini
 
 def prove(data, address, rom, mapping, objects, calls, data_relocations, function_relocations=None, *,
           index=None, switch_relocations=None, dma_fills=None, premises=None, store_bound_premises=False,
-          fresh_blocks=None):
+          fresh_blocks=None, readonly_initializer=None):
     """The composed proof for linked bytes; returns (instructions, buffer proof, schema, manifest).
 
     calls maps each BL site to its target, data_relocations each typed object word
@@ -205,6 +207,8 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
     store_bound_premises, the decomp's reviewed callee store-bound file (or None without one),
     serves the reviewed store-bound retry (store_bound_premise_profile) of the plain-path walk;
     False, the default, leaves that rule off for callers that do not pass the file.
+    readonly_initializer, the link's readonly_initializer_profile binding, types the owner's literal
+    words that address the bound `.rodata` initialiser; the manifest records it.
     """
     import closure_slot_profile as closure
     import match
@@ -220,6 +224,8 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
         "calls": [[site - address, call_name(target)] for site, target in sorted(calls.items())],
         "data": [[offset, name, value - symbols[name]] for offset, (name, value) in sorted(data_relocations.items())],
         "functions": [[offset, name] for offset, (name, _) in sorted(function_relocations.items())]}
+    readonly_sites = {offset: readonly_initializer["base"] + addend
+                      for offset, addend in readonly_initializer["sites"]} if readonly_initializer else {}
     entries = json.loads(mapping)
     if schema == FUNCTION_SCHEMA:
         # The function-literal path's own bindings: canonical function literals, direct calls,
@@ -246,7 +252,8 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
         # thunks; the object words are bound like the function-literal path's.
         _, literals = match.function_address_bindings(
             data, address, rom, mapping, objects, dict(manifest, calls=[]), allow_empty_functions=True)
-        occupied = {byte for offset in literals for byte in range(offset, offset + 4)}
+        occupied = {byte for offset in list(literals) + list(readonly_sites)
+                    for byte in range(offset, offset + 4)}
         for site, target in sorted(calls.items()):
             offset = site - address
             if offset % 2 or not 0 <= offset <= len(data) - 4 or \
@@ -338,6 +345,11 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
         switch = proof.owner_switch.record["switch"]
         if words.get(switch["literal"], (None, []))[1] == [address + switch["dispatch"] + 2]:
             remaining.discard(switch["literal"])
+    # The bound read-only initialiser's literal words (readonly_initializer_profile): each must be a
+    # reached literal holding its bound address, and is typed by the binding.
+    if any(words.get(offset, (None,))[0] != value for offset, value in readonly_sites.items()):
+        raise ValueError("read-only initialiser literal is not a reached word holding its bound address")
+    remaining -= set(readonly_sites)
     hardware = []
     if any(HARDWARE_WINDOW[0] <= words[offset][0] < HARDWARE_WINDOW[1] for offset in remaining):
         import owner_admission_profile as owner
@@ -355,6 +367,8 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
                                     for offset in outside]))
     if schema == FUNCTION_SCHEMA and address == 0x0801A518:
         manifest["record_loader"] = proof.finish()
+    if readonly_initializer:
+        manifest[readonly.MANIFEST_KEY] = readonly.manifest_record(readonly_initializer)
     return instructions, proof, schema, manifest
 
 
@@ -405,9 +419,11 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest, dma
                 if remainder_leaf.active():
                     remainder_leaf.namespace(runner.read_binary(f"{workspace}/f.i").decode("utf-8"))
                 functions, switches = {}, {}
+                binding = {}
                 got, calls, literals = link_calls(runner, workspace, args, original, address, mapping,
                                                   len(rom), rom, objects, functions, switches,
-                                                  allow_switch_data=True, function_literal_thunks=True)
+                                                  allow_switch_data=True, function_literal_thunks=True,
+                                                  readonly_initializer=binding)
             if got != data:
                 raise ValueError("data-buffer fresh complete bytes differ")
             import default_stack_index_profile as default_index
@@ -417,7 +433,7 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest, dma
                            switch_relocations=switches, dma_fills=dma_fills,
                            premises=default_index.snapshot(root),
                            store_bound_premises=store_bound.snapshot(root),
-                           fresh_blocks=fresh_block.snapshot(root))
+                           fresh_blocks=fresh_block.snapshot(root), readonly_initializer=binding or None)
             checker = Path(__file__).with_name("plausible.py")
             checked = _run_replay_process([sys.executable, str(checker), "--quiet", "--addr",
                                            f"0x{address:08X}", "--json"] +
@@ -454,6 +470,7 @@ FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* 
           "* buffer motion wrapper", "* buffer motion wrapper facts", "* buffer motion wrapper site",
           "* buffer motion wrapper premise",
           "* data symbols SHA-256", "* data buffer calls", "* data owner switch frame", "* data buffer manifest",
+          "* read-only initialiser",
           "* data buffer proof SHA-256", "* compiler", "* verified extent", "* relocations",
           "* ROM bytes", "* compiled ", "* source plausibility", "* hand-asm allow list",
           "* DMA fills", "* DMA fill premise", "* DMA fill destination premise", "* DMA fill manifest",

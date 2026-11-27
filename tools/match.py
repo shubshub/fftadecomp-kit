@@ -72,6 +72,7 @@ import split_join_profile as split_join
 import released_scratch_profile as released_scratch
 import iwram_image_profile as iwram_image
 import fresh_block_profile as fresh_block
+import readonly_initializer_profile as readonly
 import stack_pointer_compare_profile as sp_compare
 import plausible as plausibility
 import volatile_semantics
@@ -868,12 +869,18 @@ def call_bindings(image, name, address, mapping, rom_size,
                    ashldi3_bindings=None, ashldi3_index=None, float_bindings=None, float_index=None,
                    allow_double_data=False, signed_runtime_profile=None, unsigned_runtime_profile=None, thunk_pool_words=5, umod_r1_profile=None, multiple_switch_profile=None,
                    allow_self_call=False, switch_interposed_pool=False, unsigned_thunk_profile=None,
-                   switch_function_literals=False, switch_thunks=None, function_literal_thunks=False):
+                   switch_function_literals=False, switch_thunks=None, function_literal_thunks=False,
+                   readonly_initializer=None):
     """Bind external Thumb calls and explicitly mapped absolute data words.
 
     function_literal_thunks (the default path only, call_via_target_profile T1) lets a caller
     with function literals and no switch keep its canonical `_call_via_rN` calls; the proofs
     that follow decide them.
+
+    readonly_initializer (the default path only, readonly_initializer_profile) is an empty dict
+    that collects the binding of the object's one plain `.rodata` initialiser to the ROM bytes its
+    literal words address, and lets the compiler's `memcpy` bind to the pinned copy helper; None
+    keeps the `.text`-only refusal.
 
     allow_self_call admits `bl <own entry>` relocations against the function's
     own complete defined symbol; the call binds to this same verified symbol,
@@ -985,7 +992,9 @@ def call_bindings(image, name, address, mapping, rom_size,
         software_double.verify_identity(rom_image, mapping, double_index)
     elif double_index is not None:
         raise ValueError("software-double index requires its binding context")
-    allocated_text_only(image)
+    readonly_opted = readonly.opted_in(readonly_initializer)
+    rodata = readonly.section(image, allocated_text_only) if readonly_opted else allocated_text_only(image)
+    readonly_sites = {}
     symbol, offset = function_record(image, name, address, True)
     functions = [item for item in image["symbols"] if item["type"] == 2 and item["section"]]
     padding = image["text"][symbol["size"]:]
@@ -1020,6 +1029,10 @@ def call_bindings(image, name, address, mapping, rom_size,
             target_symbol = symbols[info >> 8]
             if info & 255 == 2:
                 target_name = target_symbol["name"]
+                addend = readonly.site(rodata, target_symbol, image, relocation, symbol["size"], address, occupied)
+                if addend is not None:
+                    readonly_sites[relocation] = addend
+                    continue
                 if target_symbol["section"] and switch_relocations is not None:
                     section_symbols = [item for item in image["symbols"]
                                        if item["type"] == 3 and
@@ -1091,6 +1104,7 @@ def call_bindings(image, name, address, mapping, rom_size,
             leaf_runtime = remainder_leaf.active() and target_symbol["name"] in remainder_leaf.names()
             if leaf_runtime:
                 division = remainder = quotient = unsigned_remainder = False
+            compiler_memcpy = readonly_opted and target_symbol["name"] == "memcpy"
             own_entry = allow_self_call and target_symbol["name"] == name and \
                 target_symbol["section"] == image["text_index"] and target_symbol["value"] == symbol["value"] and \
                 target_symbol["bind"] == 1 and target_symbol["type"] == 2 and \
@@ -1188,6 +1202,10 @@ def call_bindings(image, name, address, mapping, rom_size,
                 verify_udivsi3_identity(rom_image, mapping)
                 target = UDIVSI3_ADDRESS
                 candidates = []
+            elif compiler_memcpy:
+                # readonly_initializer_profile: the compiler's memcpy is the pinned copy helper
+                target = readonly.memcpy_target(image, target_symbol, rom_image)
+                candidates = []
             elif helper is not None:
                 # agbcc's _call_via_rN: a real call, through a thunk we verify
                 if target_symbol["section"] or target_symbol["bind"] != 1:
@@ -1253,6 +1271,8 @@ def call_bindings(image, name, address, mapping, rom_size,
             calls[address + relocation] = target
             if not own_entry:
                 targets[target_symbol["name"]] = target
+    if rodata is not None:
+        readonly.bind(image, address, rom_image, readonly_sites, readonly_initializer)
     if leaf_remainders and (udivsi3_bindings or divsi3_bindings or umodsi3_bindings or ashldi3_bindings or
                             float_bindings or double_bindings is not None or function_relocations or
                             function_thunks or signed_runtime_profile is not None):
@@ -1417,8 +1437,12 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
                           allow_switch_constants=False, umodsi3_bindings=None, ashldi3_bindings=None, float_bindings=None,
                           allow_double_data=False, signed_runtime_profile=None, unsigned_runtime_profile=None, thunk_pool_words=5, umod_r1_profile=None, multiple_switch_profile=None,
                           switch_interposed_pool=False, unsigned_thunk_profile=None,
-                          switch_function_literals=False, function_literal_thunks=False):
-    """Validate exact placement and the linker's complete modification surface."""
+                          switch_function_literals=False, function_literal_thunks=False,
+                          readonly_initializer=None, rom_image=b""):
+    """Validate exact placement and the linker's complete modification surface.
+
+    readonly_initializer, a binding from readonly_initializer_profile, admits exactly its `.rodata`
+    at its base, with each literal word linked to it."""
     check_switch_function_opt_in(switch_function_literals, allow_switch_data, function_thunks,
                                  function_relocations, switch_relocations)
     check_switch_pool_opt_in(switch_interposed_pool, allow_switch_data,
@@ -1473,7 +1497,11 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
                  double_bindings, function_thunks, umodsi3_bindings, ashldi3_bindings, float_bindings)
     if linked["type"] != 2 or linked["relocations"]:
         raise ValueError("expected an executable ELF without remaining relocations")
-    allocated_text_only(linked)
+    readonly_words = set()
+    if readonly_initializer:
+        readonly.check_linked(linked, readonly_initializer, rom_image, readonly_words)
+    else:
+        allocated_text_only(linked)
     before, _ = function_record(original, name, address, True)
     after, offset = function_record(linked, name, address, True)
     if after["value"] != address | 1 or offset or after["size"] != before["size"] or \
@@ -1679,6 +1707,7 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
     if any(re.fullmatch(r"\$a(?:\..*)?", item["name"]) for item in linked["symbols"]):
         raise ValueError("linked text contains an ARM mode mapping")
     patched = {position for call in calls for position in range(call - address, call - address + 4)}
+    patched.update(readonly_words)
     for relocation, (_, value) in data_relocations.items():
         if struct.unpack_from("<I", linked["text"], relocation)[0] != value:
             raise ValueError("linked data word does not equal its mapped address and addend")
@@ -1722,14 +1751,20 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
     return linked["text"][:after["size"]]
 
 
-def link_typed_targets(runner, workspace, args, name, address, targets, data_names, *, libgcc_divdi3_table=False):
-    """Link an authenticated symbol plan and compare objcopy output with the executable ELF."""
-    readonly = ""
+def link_typed_targets(runner, workspace, args, name, address, targets, data_names, *, libgcc_divdi3_table=False,
+                       readonly_initializer=None):
+    """Link an authenticated symbol plan and compare objcopy output with the executable ELF.
+
+    readonly_initializer, a binding from readonly_initializer_profile, places `.rodata` at its base."""
+    readonly_script = ""
     if libgcc_divdi3_table:
         import libgcc_divdi3 as division
-        if (address, name, targets, data_names) != (division.ADDRESS, "func_08142280", division.TARGETS, set()):
+        if (address, name, targets, data_names) != (division.ADDRESS, "func_08142280", division.TARGETS, set()) or \
+                readonly_initializer:
             raise ValueError("private libgcc division table requires its original owner and helpers")
-        readonly = f".rodata 0x{division.TABLE:08X} : {{ *(.rodata) }} "
+        readonly_script = f".rodata 0x{division.TABLE:08X} : {{ *(.rodata) }} "
+    elif readonly_initializer:
+        readonly_script = readonly.linker_line(readonly_initializer)
     definitions = [".syntax unified", ".thumb"]
     for target_name, target in sorted(targets.items()):
         if target_name in data_names:
@@ -1740,7 +1775,7 @@ def link_typed_targets(runner, workspace, args, name, address, targets, data_nam
                                 f".thumb_set {target_name}, 0x{target | 1:08X}"))
     runner.write_text(f"{workspace}/f.known.s", "\n".join(definitions) + "\n")
     script = (f"SECTIONS {{ .text 0x{address:08X} : {{ *(.text) *(.glue_7) *(.glue_7t) }} "
-              f"{readonly}"
+              f"{readonly_script}"
               ".data 0 : { *(.data) } .bss 0 : { *(.bss) } "
               ".ARM.attributes 0 : { *(.ARM.attributes) } "
               ".unexpected 0 : { *(.vfp11_veneer) *(.v4_bx) *(.iplt) *(.igot.plt) } "
@@ -1770,7 +1805,8 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                ashldi3_bindings=None, ashldi3_index=None, float_bindings=None, float_index=None,
                allow_double_data=False, signed_runtime_profile=None, unsigned_runtime_profile=None, thunk_pool_words=5, umod_r1_profile=None,
                allow_self_call=False, switch_interposed_pool=False, unsigned_thunk_profile=None,
-               switch_function_literals=False, switch_thunks=None, function_literal_thunks=False):
+               switch_function_literals=False, switch_thunks=None, function_literal_thunks=False,
+               readonly_initializer=None):
     function_thunk.check_pool_opt_in(thunk_pool_words, function_thunks)
     if umod_r1_profile is not None:
         from umod_r1_thunk_profile import check_link_context
@@ -1808,9 +1844,11 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                                                     unsigned_thunk_profile=unsigned_thunk_profile,
                                                     switch_function_literals=switch_function_literals,
                                                     switch_thunks=switch_thunks,
-                                                    function_literal_thunks=function_literal_thunks)
+                                                    function_literal_thunks=function_literal_thunks,
+                                                    readonly_initializer=readonly_initializer)
     data_names = {binding[0] for binding in data_relocations.values()}
-    linked = link_typed_targets(runner, workspace, args, name, address, targets, data_names)
+    linked = link_typed_targets(runner, workspace, args, name, address, targets, data_names,
+                                readonly_initializer=readonly_initializer)
     return (linked_function_bytes(original, linked, name, address, calls, targets,
                                   data_relocations, function_relocations, switch_relocations,
                                   allow_switch_data, udivsi3_bindings, allow_preloaded_switch,
@@ -1825,7 +1863,8 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                                   switch_interposed_pool=switch_interposed_pool,
                                   unsigned_thunk_profile=unsigned_thunk_profile,
                                   switch_function_literals=switch_function_literals,
-                                  function_literal_thunks=function_literal_thunks),
+                                  function_literal_thunks=function_literal_thunks,
+                                  readonly_initializer=readonly_initializer, rom_image=rom_image),
             calls, data_relocations)
 
 
@@ -7369,6 +7408,8 @@ def main():
             dma_fills = None
             return_scratch = None
             self_sites = frozenset()
+            # readonly_initializer_profile: the default route collects a `.rodata` binding here.
+            readonly_binding = {} if default_call_route(args, unit_context) else None
             if thunk_profile:
                 got, calls, function_relocations, data_relocations = function_thunk.object_bytes(
                     runner, workspace, args, original, addr, mapping, rom, data_mapping,
@@ -7407,7 +7448,8 @@ def main():
                                                           switch_interposed_pool=pool_switch_profile,
                                                           switch_function_literals=function_switch_profile,
                                                           switch_thunks=thunk_switch_selector,
-                                                          function_literal_thunks=default_call_route(args, unit_context))
+                                                          function_literal_thunks=default_call_route(args, unit_context),
+                                                          readonly_initializer=readonly_binding)
                 linked_profile = bool(calls)
                 self_sites = frozenset(site for site, target in calls.items() if target == addr)
             else:
@@ -7658,7 +7700,8 @@ def main():
                             verified_instructions, buffer_proof, data_buffer_schema, data_buffer_evidence = \
                                 data_buffer.prove(got, addr, rom, mapping, data_mapping, calls, data_relocations,
                                                   index=inert_spin.index_snapshot(ROOT),
-                                                  switch_relocations=switch_relocations)
+                                                  switch_relocations=switch_relocations,
+                                                  readonly_initializer=readonly_binding or None)
                         except ValueError as owner_error:
                             raise ValueError(f"{switch_error}; owner-switch data-buffer proof: "
                                              f"{owner_error}") from owner_error
@@ -7701,7 +7744,8 @@ def main():
                                 data_buffer.prove(got, addr, rom, mapping, data_mapping, calls,
                                                   data_relocations, function_relocations,
                                                   index=empty_index, premises=default_index.snapshot(ROOT),
-                                                  fresh_blocks=fresh_block.snapshot(ROOT))
+                                                  fresh_blocks=fresh_block.snapshot(ROOT),
+                                                  readonly_initializer=readonly_binding or None)
                         else:
                             # The buffer proof binds a call-via call by its canonical thunk name (T1);
                             # a manifest without one is the frameless proof's, unchanged.
@@ -7783,7 +7827,10 @@ def main():
                                           index=inert_spin.index_snapshot(ROOT), dma_fills=dma_fills,
                                           premises=default_index.snapshot(ROOT),
                                           store_bound_premises=store_bound.snapshot(ROOT),
-                                          fresh_blocks=fresh_block.snapshot(ROOT))
+                                          fresh_blocks=fresh_block.snapshot(ROOT),
+                                          readonly_initializer=readonly_binding or None)
+            if readonly_binding and data_buffer_evidence is None:
+                raise ValueError("a read-only initialiser is admitted only with data-buffer evidence")
             if args.signed_quotient_profile is not None and quotient_evidence is None:
                 raise ValueError("framed signed quotient requires canonical __divsi3 ELF calls")
             if args.unsigned_quotient_profile is not None and division_evidence is None:

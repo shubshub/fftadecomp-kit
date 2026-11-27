@@ -2072,6 +2072,48 @@ A report that relied on it prints the row and the review text verbatim on
 one `* buffer fresh block premise:` line and binds both into its buffer
 fingerprint. Synthetic boundaries are in `tests/test_fresh_block_premises.py`.
 
+### A compiler read-only initialiser on the default path
+
+agbcc lowers a local aggregate with a constant initialiser
+(`u16 ticks[4] = {58, 82, 270, 270};`) to a `.rodata` object and a copy: inline
+word moves, or a call to the compiler's `memcpy`. The default path linked
+`.text` only and refused any other allocated section ("unexpected nonempty
+allocated section"); only the ROM-table-copy and stack-index selectors bound
+such an initialiser. `readonly_initializer_profile` binds it on the default
+path, with the selector's own helpers in `rom_table_copy_profile`, for the
+data-buffer schemas:
+- the object has exactly one allocated section besides `.text`, a plain
+  `.rodata` (PROGBITS, flags A only, alignment 1, 2 or 4, at most 4096 bytes)
+  with no relocations of its own; anything else keeps the old refusal;
+- every reference to it is an R_ARM_ABS32 against its local section symbol
+  that covers a complete, aligned literal word of the function no other
+  relocation touches, with its addend inside the section;
+- every such word in the ROM, less its addend, gives one base B, aligned to the
+  section, with [B, B + size) inside the cartridge ROM image (not RAM, IWRAM or
+  a mirror, not past the image's end) and outside the owner; one disagreeing
+  word refuses;
+- the ROM bytes at B equal the section bytes, and the link places `.rodata`
+  at B with exactly those bytes and each literal word at B plus its addend;
+- on every default route, plain routes included, with or without a `.rodata`
+  initialiser (a struct assignment calls it too), a call to the unique
+  undefined global `memcpy` binds to the pinned copy helper `0x081443FC` only when its 98 bytes are the
+  canonical copy routine and it is an indexed Thumb function; the walks then
+  treat it as any call to the helper (the copy summary under its own
+  preconditions, or a walked callee);
+- the data-buffer proof types each literal word as the bound initialiser; its
+  manifest records the binding (base, size, SHA-256, literal words), which the
+  data-buffer fingerprint covers, and one `* read-only initialiser:` line
+  prints B, the size and the digest. A `.rodata` binding on a function no
+  data-buffer schema admits refuses; the `memcpy` binding alone has no such
+  gate.
+
+The binding is byte equality and needs no premise. Every access through the
+literal (reads, writes, calls, escapes) gets the treatment of a named data
+object, and the object's extent is not walked; the line says so. Writes
+through the literal and escapes of its address are therefore not refused,
+although the object is read-only in the ROM: no rule here checks them. The
+replay recompiles and rebinds. Tests are in `tests/test_readonly_initializer.py`.
+
 ### GBA BIOS wrappers in plain buffer walks
 
 The plain register and stack buffer proofs (`elf-symbol-thumb-frame-buffer-calls-v1`
