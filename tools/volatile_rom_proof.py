@@ -88,9 +88,16 @@ the addressed source wherever two things hold, and refuses it otherwise.
      above it is installed in RAM and called at addresses only an overlay
      map knows), and the whole ROM is scanned for references to it: BL
      instructions that reach it, Thumb branches into it from outside, and
-     words holding its address.  A branch into it, a BL from another place
-     than an indexed function with a matched source below CODE_END, its own
-     call, and an address word other than below refuse.  Each caller's source
+     words holding its address.  A halfword that reads as such a branch but
+     lies in a literal pool that no modelled reference reaches is none
+     (pool_halfword: a word pc-relative loads read, after an instruction
+     that never goes on, that no BL, branch, return or word enters); the
+     record prints each such halfword and the premise that nothing the scan
+     does not model runs it: an address formed by arithmetic, a lone BL
+     suffix, a copy in RAM or ARM code.  A branch into it, a BL from
+     another place than an indexed function with a matched source below
+     CODE_END, its own call, and an address word other than below refuse.
+     Each caller's source
      is compiled, must match the ROM, must hold a BL relocation to the
      function at the site, and the argument register set in the call's block
      is resolved as above, one level deep (the caller's own parameter
@@ -1093,40 +1100,114 @@ def bl_index(rom):
     return _BL_INDEX[key]
 
 
-def rom_references(rom, address, end):
-    """(BL sites reaching the start, [(site, target)] of BLs, Thumb branches from outside and words that reach or
-    hold an address inside [address, end) other than the start's call or its Thumb address, sites of words
-    holding address | 1)"""
-    index = bl_index(rom)
-    calls = list(index.get(address, []))
-    inside = [(site, target) for target in range(address + 2, end, 2) for site in index.get(target, [])]
-    for at in range(max(address - 2052, BASE), min(end + 2048, BASE + len(rom) - 1), 2):
-        if address <= at < end:
-            continue
-        half = struct.unpack_from("<H", rom, at - BASE)[0]
-        if half & 0xF800 == 0xE000:
-            offset = (half & 0x7FF) << 1
-            offset -= 1 << 12 if offset & 1 << 11 else 0
-        elif half & 0xF000 == 0xD000 and (half >> 8) & 0xF < 0xE:
-            offset = (half & 0xFF) << 1
-            offset -= 1 << 9 if offset & 1 << 8 else 0
-        else:
-            continue
-        if address <= at + 4 + offset < end:
-            inside.append((at, at + 4 + offset))
-    words = set()
-    for prefix in range(address >> 8, ((end - 1) >> 8) + 1):
+def thumb_branch(rom, at):
+    """the target of the Thumb `b` or `b<cond>` the halfword at ROM address `at` decodes as, or None"""
+    half = struct.unpack_from("<H", rom, at - BASE)[0]
+    if half & 0xF800 == 0xE000:
+        offset = (half & 0x7FF) << 1
+        offset -= 1 << 12 if offset & 1 << 11 else 0
+    elif half & 0xF000 == 0xD000 and (half >> 8) & 0xF < 0xE:
+        offset = (half & 0xFF) << 1
+        offset -= 1 << 9 if offset & 1 << 8 else 0
+    else:
+        return None
+    return at + 4 + offset
+
+
+def words_into(rom, low, high):
+    """[(site, value)] of the four bytes at every ROM offset, any alignment, whose value & ~1 lies in [low, high)"""
+    found = []
+    for prefix in range(low >> 8, ((high - 1) >> 8) + 1):
         pattern = struct.pack("<I", prefix << 8)[1:]
         at = rom.find(pattern, 1)
         while at >= 1:
             value = struct.unpack_from("<I", rom, at - 1)[0]
-            if address <= value & ~1 < end:
-                if value == address | 1:
-                    words.add(BASE + at - 1)
-                else:
-                    inside.append((BASE + at - 1, value))
+            if low <= value & ~1 < high:
+                found.append((BASE + at - 1, value))
             at = rom.find(pattern, at + 1)
-    return calls, sorted(set(inside)), sorted(words)
+    return found
+
+
+MOV_LR_PC = 0x46FE
+BL_PREFIX_MASK, BL_PREFIX = 0xF800, 0xF000
+
+
+def ends_flow(half):
+    """the Thumb halfword is an instruction that never goes on to the next one: a `b`, a `bx` or `mov pc` of a
+    register other than pc (`bx pc` and `mov pc, pc` go on two halfwords later) or a `pop {..., pc}`"""
+    return (half & 0xF800 == 0xE000 or half & 0xFF00 == 0xBD00 or
+            half & 0xFF87 in (0x4700, 0x4687) and half & 0x78 != 0x78)
+
+
+def pool_halfword(rom, at, index):
+    """(first, stop, loads) when no reference the scan models reaches the halfword at `at` as Thumb code, else None.
+
+    The halfword must lie in a literal word that pc-relative loads read (`loads`, pc_loads), in a pool of such
+    words that begins right after `stop`, the nearest instruction before it that never goes on (ends_flow), or
+    one alignment halfword after it; `stop` must not follow the `mov lr, pc` that would make the next halfword
+    a return address, nor a lone BL prefix, which sets lr to its own address + 4 plus its offset: the next
+    halfword for offset 0, so `bl` prefix 0xF000 then `bx r1` is a call that returns into the pool.  No reference the scan models may enter [first, at], first = stop + 2: no BL, no Thumb
+    `b` or `b<cond>` anywhere in reach (the function's and the pool's own halfwords included), and no word at
+    any ROM offset holding an address in it.  Then, by induction from first, no halfword up to `at` is reached
+    by falling through, a branch, a call, a return or an address word.  That is all it proves: what the scan
+    does not model for the function either could still run it (an address formed by arithmetic, a lone BL
+    suffix, which branches relative to lr, a copy in RAM, or ARM code), and the record prints that premise.
+    index is bl_index(rom).
+    """
+    word = at & ~3
+    loads = pc_loads(rom, word)
+    if not loads:
+        return None
+    start = word
+    while True:
+        stop = next((site for site in (start - 2, start - 4)
+                     if site >= BASE and ends_flow(struct.unpack_from("<H", rom, site - BASE)[0])), None)
+        if stop is not None:
+            break
+        if start - 4 < BASE or not pc_loads(rom, start - 4):
+            return None
+        start -= 4
+    if stop - 2 >= BASE:
+        before = struct.unpack_from("<H", rom, stop - 2 - BASE)[0]
+        if before == MOV_LR_PC or before & BL_PREFIX_MASK == BL_PREFIX:
+            return None
+    first, last = stop + 2, at + 2
+    if any(index.get(target) for target in range(first, last, 2)) or words_into(rom, first, last):
+        return None
+    for site in range(max(first - 2050, BASE), min(last + 2044, BASE + len(rom) - 1), 2):
+        target = thumb_branch(rom, site)
+        if target is not None and first <= target < last:
+            return None
+    return first, stop, loads
+
+
+def rom_references(rom, address, end):
+    """(BL sites reaching the start, [(site, target)] of BLs, Thumb branches from outside and words that reach or
+    hold an address inside [address, end) other than the start's call or its Thumb address, sites of words
+    holding address | 1, [(site, target, first, stop, loads)] of Thumb branch decodes from outside reaching
+    inside that are literal-pool halfwords no modelled reference reaches (pool_halfword), and so no reference)"""
+    index = bl_index(rom)
+    calls = list(index.get(address, []))
+    inside = [(site, target) for target in range(address + 2, end, 2) for site in index.get(target, [])]
+    pools = []
+    for at in range(max(address - 2052, BASE), min(end + 2048, BASE + len(rom) - 1), 2):
+        if address <= at < end:
+            continue
+        target = thumb_branch(rom, at)
+        if target is None or not address <= target < end:
+            continue
+        pool = pool_halfword(rom, at, index)
+        if pool is None:
+            inside.append((at, target))
+        else:
+            pools.append((at, target) + pool)
+    words = set()
+    for site, value in words_into(rom, address, end):
+        if value == address | 1:
+            words.add(site)
+        else:
+            inside.append((site, value))
+    return calls, sorted(set(inside)), sorted(words), pools
 
 
 def pc_loads(rom, word):
@@ -1194,7 +1275,7 @@ class Callers:
         if self.address >= CODE_END:
             raise ProofError(f"the parameter's function lies at or above {CODE_END:#010x}, code the game installs in "
                              "RAM: its callers cannot be closed without an overlay map")
-        calls, inside, words = rom_references(self.rom, self.address, self.end)
+        calls, inside, words, pools = rom_references(self.rom, self.address, self.end)
         if inside:
             site, target = inside[0]
             raise ProofError(f"{site:08X} reaches or holds {target:08X} inside the function (only calls of its start "
@@ -1230,7 +1311,7 @@ class Callers:
         for site in words:
             start = owner(site)
             registrations.append((site, start) + self.registration(start, site))
-        return direct, registrations
+        return direct, registrations, pools
 
     def calls_reach_code(self, start, sites):
         """every call of the function in func_<start>'s expand dump reaches its own BL among `sites`: a later pass
@@ -1362,10 +1443,17 @@ class Callers:
             self.scan()
         if number > 3:
             raise ProofError("callers pass it on the stack, which is not traced")
-        direct, registrations = self.scan()
+        direct, registrations, pools = self.scan()
         found, ranges = [], [f"the code runs where it lies below {CODE_END:#010x} (no copy of it in RAM is "
                              "modelled), and no address of it is formed by arithmetic (an adr, an add, an offset "
                              "table), which the scan does not see"]
+        for site, target, first, stop, loads in pools:
+            ranges.append(f"{site:08X}, a branch to {target:08X} if it ran, is literal data no modelled reference "
+                          f"reaches: the word {site & ~3:08X} is loaded by "
+                          f"{', '.join(f'{load:08X}' for load in loads)}, its pool from {first:08X} follows "
+                          f"{stop:08X}, which never goes on, and no BL, branch, return or word enters "
+                          f"{first:08X}..{site + 1:08X}; unproved, so assumed: nothing the scan does not model runs it "
+                          "(an address formed by arithmetic, a lone BL suffix, a copy in RAM, ARM code)")
         for site, start in direct:
             base, extra = self.argument(start, site, number)
             if base.kind == "param":
