@@ -97,6 +97,15 @@ class RtlTests(unittest.TestCase):
             with self.subTest(label=label_), self.assertRaisesRegex(proof.ProofError, reason):
                 fill.fills(function(insns))
 
+    def test_a_reference_opening_a_fill_s_block_is_refused(self):
+        # the first insn of the fill's block, after a call, with no loop: no path of one or more steps from the
+        # block's start comes back to it, so only the block's own span (its first insn to its call) catches it
+        call = (4, 'call_insn (call (mem:SI (symbol_ref:SI ("func_08000400")) 0) (const_int 0)) -1 (nil) (nil) '
+                   '(expr_list (use (reg:SI 0 r0)) (nil))')
+        reason = "UID 30 is a frame reference with no constant offset on a path to or from the fill at insn UID 16"
+        with self.assertRaisesRegex(proof.ProofError, reason):
+            fill.fills(function([ENTRY, call, UNKNOWN] + fill_insns(10)))
+
     def test_a_volatile_store_at_an_unplaceable_offset_is_refused(self):
         volatile = (30, "insn (set (mem/v:SI (plus:SI (reg:SI 18 virtual-stack-vars) (reg/v:SI 22)) 0) "
                         "(const_int 0)) -1 (nil) (nil)")
