@@ -40,7 +40,9 @@ symbolically along every path, and the check requires
    verdict, or of one that reads a saved slot past a store at a variable
    offset, names its premises (FRAME_READ_PREMISES).  Every callee
    needs a file-scope prototype with a fixed list of one-word arguments;
-   no prototype, `()`, `...` and wider arguments fail closed.  A
+   no prototype, `()`, `...` and wider arguments fail closed.  The callee
+   owns its stack-argument words, so a frame load after the call reads each
+   as the callee's opaque value, never the caller's store.  A
    `bl _call_via_rN` is an opaque call like a named one when rN holds a
    word loaded from a file-scope function-pointer object (or array) whose
    declared type is such a prototype and whose every use in a body is a
@@ -1920,6 +1922,19 @@ class Executor:
         compared = self.local_fill_arguments(target, arguments, text, record)
         self.trace.append(("call", target, tuple(compared)))
         self.memory.append(("call", event))
+        if not self.escaped:
+            # The callee owns its stack-argument words and may overwrite them (agbcc stores
+            # back into its own: `ldr r1, [sp, #4]; add r1, r0; str r1, [sp, #4]`).  Before an
+            # escape a frame load passes every call, so each word gets a store of the callee's
+            # value: opaque, named by this call and the word it was handed, and not clean, so
+            # it builds no object offset and decides no branch.  After an escape the call
+            # stops every frame load that is not internal, and escaped-local extents keep the
+            # words visible, so no store is needed there (volatile_loop_induction records
+            # these stores the same way, and its own escaped-frame ones).
+            for n in range(4, count):
+                address = add(self.regs["sp"], 4 * (n - 4))
+                self.memory.append(("store", 4, address, ("callee-argument", event, n, self.current(4, address)),
+                                    None, False, True))
         # The premise restricts source reads, not numeric return/clobber/flags
         # values. Raw dependencies prevent their observations from equating
         # calls whose physical source addresses differ.
