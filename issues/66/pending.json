@@ -223,6 +223,390 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "2a4f77a53de2b43eb61609423e012278be2252950042b84d311f23590cf1b376",
+        "acknowledged_cursor": 7210538076,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "2a4f77a53de2b43eb61609423e012278be2252950042b84d311f23590cf1b376",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080E1EE0\",\"who\":\"claude-ffta2\",\"note\":\"hand match: regalloc near miss (scout-W13 FRESH)\"}",
+          "created_at": "2026-11-27T05:18:01Z",
+          "id": 7210518502,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-27T05:18:01Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9324e0c70a3b435389f9f944409fb70111733a62bf06122b1ac689221a85ef1f",
+        "result": {
+          "address": "0x080E1EE0",
+          "claim_id": 7210518502,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 7210518502,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "a0e8515feaa58314c95390d35639610ceb12a0f6a782ea322ca541b5181fd8cb",
+        "acknowledged_cursor": 7210538076,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a0e8515feaa58314c95390d35639610ceb12a0f6a782ea322ca541b5181fd8cb",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080200C8\",\"who\":\"claude-ffta2\",\"note\":\"hand match: regalloc near miss (scout-W13 FRESH)\"}",
+          "created_at": "2026-11-27T05:18:08Z",
+          "id": 7210520193,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-27T05:18:08Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9324e0c70a3b435389f9f944409fb70111733a62bf06122b1ac689221a85ef1f",
+        "result": {
+          "address": "0x080200C8",
+          "claim_id": 7210520193,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 7210520193,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "ab979a46c0e70aae7f47a08b207eda0ac3c7aa32f65c8e00a6615ba746570360",
+        "acknowledged_cursor": 7210538076,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ab979a46c0e70aae7f47a08b207eda0ac3c7aa32f65c8e00a6615ba746570360",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DFF8C\",\"who\":\"claude-ffta2\",\"note\":\"hand match: regalloc near miss (scout-W13 FRESH)\"}",
+          "created_at": "2026-11-27T05:18:14Z",
+          "id": 7210521721,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-27T05:18:14Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9324e0c70a3b435389f9f944409fb70111733a62bf06122b1ac689221a85ef1f",
+        "result": {
+          "address": "0x080DFF8C",
+          "claim_id": 7210521721,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 7210521721,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "d7a9312757de52df039e9151e438fe584752e06d2a82c03703655c3991e00f6f",
+        "acknowledged_cursor": 7210538076,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d7a9312757de52df039e9151e438fe584752e06d2a82c03703655c3991e00f6f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080570D8\",\"who\":\"claude-ffta2\",\"note\":\"hand match: regalloc near miss (scout-W13 FRESH)\"}",
+          "created_at": "2026-11-27T05:18:22Z",
+          "id": 7210523499,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-27T05:18:22Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9324e0c70a3b435389f9f944409fb70111733a62bf06122b1ac689221a85ef1f",
+        "result": {
+          "address": "0x080570D8",
+          "claim_id": 7210523499,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 7210523499,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "fdd56dd54f9108ebd306820232d457efa2ce0f8796bba7f1e6bc247cc64df046",
+        "acknowledged_cursor": 7210538076,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "fdd56dd54f9108ebd306820232d457efa2ce0f8796bba7f1e6bc247cc64df046",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080F29B4\",\"who\":\"claude-ffta2\",\"note\":\"hand match: regalloc near miss (scout-W13 FRESH)\"}",
+          "created_at": "2026-11-27T05:18:29Z",
+          "id": 7210525229,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-27T05:18:29Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9324e0c70a3b435389f9f944409fb70111733a62bf06122b1ac689221a85ef1f",
+        "result": {
+          "address": "0x080F29B4",
+          "claim_id": 7210525229,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 7210525229,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "3c0070981e96bfdab4ca2cea3d6f14d5ce95d546a0929098d93890f53225e380",
+        "acknowledged_cursor": 7210538076,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3c0070981e96bfdab4ca2cea3d6f14d5ce95d546a0929098d93890f53225e380",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0806E384\",\"who\":\"claude-ffta2\",\"note\":\"hand match: regalloc near miss (scout-W13 FRESH)\"}",
+          "created_at": "2026-11-27T05:18:38Z",
+          "id": 7210527211,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-27T05:18:38Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9324e0c70a3b435389f9f944409fb70111733a62bf06122b1ac689221a85ef1f",
+        "result": {
+          "address": "0x0806E384",
+          "claim_id": 7210527211,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 7210527211,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "4048329edf6f08f7875a23865d28484db6807a93bb595fd8b7fb6cc416584a85",
+        "acknowledged_cursor": 7210538076,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4048329edf6f08f7875a23865d28484db6807a93bb595fd8b7fb6cc416584a85",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08083C08\",\"who\":\"claude-ffta2\",\"note\":\"hand match: regalloc near miss (scout-W13 FRESH)\"}",
+          "created_at": "2026-11-27T05:18:47Z",
+          "id": 7210529202,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-27T05:18:47Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9324e0c70a3b435389f9f944409fb70111733a62bf06122b1ac689221a85ef1f",
+        "result": {
+          "address": "0x08083C08",
+          "claim_id": 7210529202,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 7210529202,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "86aa327d6922411a0e5e15fb880c27a58ae85127484e38c21242a43504a23ede",
+        "acknowledged_cursor": 7210538076,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "86aa327d6922411a0e5e15fb880c27a58ae85127484e38c21242a43504a23ede",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08023FD0\",\"who\":\"claude-ffta2\",\"note\":\"hand match: regalloc near miss (scout-W13 FRESH)\"}",
+          "created_at": "2026-11-27T05:18:54Z",
+          "id": 7210530755,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-27T05:18:54Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9324e0c70a3b435389f9f944409fb70111733a62bf06122b1ac689221a85ef1f",
+        "result": {
+          "address": "0x08023FD0",
+          "claim_id": 7210530755,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 7210530755,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "0937e82380721cb9670f09e30fb9dc34569046e1a09f5d031eb300d51e4ae9fa",
+        "acknowledged_cursor": 7210538076,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0937e82380721cb9670f09e30fb9dc34569046e1a09f5d031eb300d51e4ae9fa",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0810EC04\",\"who\":\"claude-ffta2\",\"note\":\"hand match: regalloc near miss (scout-W13 FRESH)\"}",
+          "created_at": "2026-11-27T05:19:00Z",
+          "id": 7210532139,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-27T05:19:00Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9324e0c70a3b435389f9f944409fb70111733a62bf06122b1ac689221a85ef1f",
+        "result": {
+          "address": "0x0810EC04",
+          "claim_id": 7210532139,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 7210532139,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "18612fbe4c60b1bb42a92a5957b5e6c39a0b841f330b1ae67d17d5abfa870475",
+        "acknowledged_cursor": 7210538076,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "18612fbe4c60b1bb42a92a5957b5e6c39a0b841f330b1ae67d17d5abfa870475",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081137BC\",\"who\":\"claude-ffta2\",\"note\":\"hand match: regalloc near miss (scout-W13 FRESH)\"}",
+          "created_at": "2026-11-27T05:19:14Z",
+          "id": 7210535361,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-27T05:19:14Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9324e0c70a3b435389f9f944409fb70111733a62bf06122b1ac689221a85ef1f",
+        "result": {
+          "address": "0x081137BC",
+          "claim_id": 7210535361,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 7210535361,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "93a242c9f4423bd4791231487f0ca139499f3e6c9cfe6914062ab07eebd4869f",
+        "acknowledged_cursor": 7210538076,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "93a242c9f4423bd4791231487f0ca139499f3e6c9cfe6914062ab07eebd4869f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08125DE8\",\"who\":\"claude-ffta2\",\"note\":\"hand match: regalloc near miss (scout-W13 FRESH)\"}",
+          "created_at": "2026-11-27T05:19:20Z",
+          "id": 7210536817,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-27T05:19:20Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9324e0c70a3b435389f9f944409fb70111733a62bf06122b1ac689221a85ef1f",
+        "result": {
+          "address": "0x08125DE8",
+          "claim_id": 7210536817,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 7210536817,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "d4b7c57db1e7df1aaa3211ba38daf6110134aae2593c2baf336fa0c444465aaf",
+        "acknowledged_cursor": 7210538076,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d4b7c57db1e7df1aaa3211ba38daf6110134aae2593c2baf336fa0c444465aaf",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08016070\",\"who\":\"claude-ffta2\",\"note\":\"hand match: regalloc near miss (scout-W13 FRESH)\"}",
+          "created_at": "2026-11-27T05:19:26Z",
+          "id": 7210538076,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-27T05:19:26Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9324e0c70a3b435389f9f944409fb70111733a62bf06122b1ac689221a85ef1f",
+        "result": {
+          "address": "0x08016070",
+          "claim_id": 7210538076,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 7210538076,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
