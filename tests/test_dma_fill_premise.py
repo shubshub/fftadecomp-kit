@@ -174,6 +174,16 @@ class DmaFillPremiseWalkTests(unittest.TestCase):
         self.refused(source(count="cmp r1, #0\nbeq 1f\nldrh r2, [r2, #6]\nb 2f\n1:\nldrh r2, [r2, #4]\n2:"),
                      r"count has no defined derivation")
 
+    def test_unknown_high_bits_stay_unknown_through_asr_and_and(self):
+        # (u32[r2+4] >>s 16) | 0x81000000: bits 30-25 and 23-16 copy the unknown sign bit
+        self.refused(source(count="ldr r2, [r2, #4]",
+                            control="asrs r2, r2, #16\nmovs r1, #0x81\nlsls r1, r1, #24\norrs r2, r1"),
+                     r"bits 16-31 are not known on every path")
+        # (0xFFFFFFFF & u32[r2+4]) | 0x81000000: an AND with known ones leaves the word's bits unknown
+        self.refused(source(count="ldr r2, [r2, #4]",
+                            control="ldr r1, =0xFFFFFFFF\nands r1, r2\nmovs r2, #0x81\nlsls r2, r2, #24\norrs r2, r1"),
+                     r"bits 16-31 are not known on every path")
+
     def test_a_frame_address_destination_stays_an_escape(self):
         self.refused(source(destination="add r3, sp, #4"), base.ESCAPE)
         # formed before the source store, the core refuses the destination store itself
