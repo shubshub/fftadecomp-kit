@@ -1638,6 +1638,7 @@ def report_matches(report, root, address):
             from named_data_buffer_profile import (BIOS_FILL_SCHEMA, BIOS_FILL_SELECTOR,
                 BIOS_LOCAL_FILL_SCHEMA, BIOS_LOCAL_FILL_SELECTOR, BIOS_OVERWRITE_SCHEMA, BIOS_OVERWRITE_SELECTOR)
             import scene_palette_copy
+            import named_data_buffer_copy_binding_profile as copy80
             if any(line.startswith(scene_palette_copy.RECORD) for line in report.splitlines()):
                 if address != scene_palette_copy.OWNER or f'* verification: `{scene_palette_copy.SCHEMA}`' not in stated:
                     return False
@@ -1652,6 +1653,11 @@ def report_matches(report, root, address):
             elif f'* verification: `{BIOS_FILL_SCHEMA}`' in report.splitlines():
                 records += allowlisted_volatile_semantics(root, address,
                     owner_runtime_profile=BIOS_FILL_SELECTOR)
+            elif f'* verification: `{copy80.SCHEMA}`' in report.splitlines():
+                # kit#375, rule T: the copy80 route types the compiler's memcpy at issuance, so the
+                # replay must take the same route, or the typed copy's save has no prototype to compare
+                records += allowlisted_volatile_semantics(root, address,
+                    owner_runtime_profile=copy80.SELECTOR)
             else:
                 # a library unit report was compiled with its unit's toolchain
                 unit_arguments = library_units.report_arguments(report)
