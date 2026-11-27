@@ -56,6 +56,9 @@ def owner_program(*, before=(), tail=(), frame=8, forwarded=0xA907):
 def bound(program, bodies, *, policy=V2):
     data, calls = program.build()
     p = fixture({A: data, **bodies, **BODIES}, policy=policy)
+    # The complete-owner route keeps the root's R12 exit-scratch ledger (r12_exit_scratch_profile).
+    import r12_exit_scratch_profile as r12_exit
+    r12_exit.enable(p)
     span = p.span
     runtimes = set(match.function_thunk.ALIASES.values())
     p.span = lambda a: half(0x4710) if a in runtimes else span(a)

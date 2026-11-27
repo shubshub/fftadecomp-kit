@@ -22,7 +22,7 @@ The rule, at every return whose aliases hold R12:
 3. a root walk refuses unless its proof keeps the ledger: only the proofs whose reports print
    and bind it do.  BufferCallProof and FunctionBufferCallProof (exact types, stack arguments)
    keep it from construction: the default path's plain, data and function-literal buffer
-   reports print `BufferCallProof.exit_r12_lines` and bind its fingerprint, and every replay of
+   reports print `lines` and bind its fingerprint, and every replay of
    them compares both; the complete-owner route (`owner_admission_profile`) enables it on its
    proofs (`enable`) and records the line in its manifest.  With the ledger, an exact
    own-frame offset below the entry SP is recorded (site, offset) and admitted under the

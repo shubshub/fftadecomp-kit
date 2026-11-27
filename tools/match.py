@@ -4932,11 +4932,6 @@ class BufferCallProof:
             digest.update(r12_payload)
         return digest.hexdigest()
 
-    def exit_r12_lines(self):
-        """The R12 exit-scratch premise line (r12_exit_scratch_profile); empty unless recorded."""
-        import r12_exit_scratch_profile as r12_exit
-        return r12_exit.lines(self)
-
     def buffer_evidence(self):
         """An inspected buffer call, the default stack-index retry's record, or a runtime site the
         default path's division leaf retry summarised (signed_remainder_leaf_profile.summarised_evidence)."""
@@ -6822,8 +6817,9 @@ def render_report(*, addr, src_rel, schema, fingerprint, compiler, want, span, g
                    STACK_BUFFER_SUMMARY if buffer_proof.stack_arguments else BUFFER_SUMMARY)
         out.append(f"* buffer calls: {summary}\n")
         out.append(f"* buffer proof SHA-256: `{buffer_proof.fingerprint()}`\n")
+        import r12_exit_scratch_profile as r12_exit
         for line in buffer_proof.loop_replay_lines() + buffer_proof.bios_summary_lines() + \
-                buffer_proof.exit_r12_lines():
+                r12_exit.lines(buffer_proof):
             out.append(line + "\n")
     if buffer_proof is not None or callee_watch is not None:
         # The #350 premises: issuance records them with its buffer proof, a plain replay with the
