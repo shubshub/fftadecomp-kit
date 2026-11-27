@@ -1,6 +1,7 @@
 """Natural compiler switch callees and context-specific watched alias proofs."""
 import argparse
 import copy
+import report_fixtures
 import hashlib
 import json
 import os
@@ -187,7 +188,7 @@ class NativeTests(unittest.TestCase):
         self.assertEqual(switch['structure']['cases'], 8)
         self.assertTrue(buffers['switch_contexts'])
         self.assertEqual(dict(self.check(self.proof()).words), {-12:('pointer',-4)})
-        self.assertTrue(match_evidence.report_matches(self.report, self.root, A))
+        self.assertTrue(match_evidence.report_matches(report_fixtures.carried(self.report, self.root, A), self.root, A))
 
     def test_old_selector_still_refuses_mov_pc(self):
         with self.assertRaisesRegex(ValueError, 'unresolved|unsupported'):

@@ -1,5 +1,6 @@
 """Exact target-state DIV composition; constant quotient policy stays isolated."""
 import copy
+import report_fixtures
 import json
 import struct
 import unittest
@@ -34,7 +35,7 @@ class SoftwareDoubleDivisionTests(fixture.SoftwareDoubleTests):
         report=self.native_report()
         opening,reading=self.patched_rom()
         with opening,reading:
-            self.assertTrue(profile.report_matches(report,self.root,BASE))
+            self.assertTrue(profile.report_matches(report_fixtures.uncarried(report),self.root,BASE))
             path=self.root/'src/08000000.c'
             path.write_text(SOURCE.replace('numerator / denominator','numerator / 7'))
             self.assertFalse(profile.report_matches(report,self.root,BASE))

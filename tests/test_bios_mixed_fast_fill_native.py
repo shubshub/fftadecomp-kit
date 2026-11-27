@@ -12,6 +12,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import bios_fast_fill_source_profile as fast
 import match
+import report_fixtures
 import match_evidence
 import named_data_buffer_profile as buffers
 import owner_admission_profile as owner
@@ -70,7 +71,7 @@ class MixedFastFillNativeTests(unittest.TestCase):
                 result = owner.build(root, A, selector=buffers.MIXED_FAST_FILL_SELECTOR)
                 self.assertEqual(result[8], original)
                 report = owner.render(A, result)
-                self.assertTrue(match_evidence.report_matches(report, root, A))
+                self.assertTrue(match_evidence.report_matches(report_fixtures.carried(report, root, A), root, A))
                 check = subprocess.run([sys.executable, str(Path(match.__file__)),
                     '--root', str(root), f'0x{A:08X}', '--owner-runtime-profile',
                     buffers.MIXED_FAST_FILL_SELECTOR], text=True, capture_output=True)

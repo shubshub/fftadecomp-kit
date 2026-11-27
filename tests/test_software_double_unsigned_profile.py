@@ -1,6 +1,7 @@
 """Canonical unsigned word conversion, wide comparison and double negation."""
 
 import copy
+import report_fixtures
 import json
 import struct
 import unittest
@@ -51,7 +52,7 @@ class SoftwareDoubleUnsignedTests(unittest.TestCase):
         report = self.native_report()
         opening, reading = self.patched_rom()
         with opening, reading:
-            self.assertTrue(profile.report_matches(report, self.root, BASE))
+            self.assertTrue(profile.report_matches(report_fixtures.uncarried(report), self.root, BASE))
             (self.root / "src/08000000.c").write_text(SOURCE.replace("return result;", "return 0;"))
             self.assertFalse(profile.report_matches(report, self.root, BASE))
 

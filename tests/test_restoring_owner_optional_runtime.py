@@ -22,6 +22,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import match
+import report_fixtures
 import match_evidence
 import owner_admission_profile as owner
 import owner_runtime_profile as runtime
@@ -407,9 +408,10 @@ class CompiledOwnerTests(unittest.TestCase):
         self.assertEqual(manifest['proof']['runtime_calls'], [])
         self.assertTrue(manifest['bindings']['switches'])
         self.assertTrue(manifest['bindings']['data'])
-        self.assertTrue(match_evidence.report_matches(self.report, self.root, A))
+        self.assertTrue(match_evidence.report_matches(report_fixtures.carried(self.report, self.root, A), self.root, A))
         import rebuild
-        self.assertEqual(rebuild.saved_profile_arguments(self.report, self.root, A),
+        self.assertEqual(rebuild.saved_profile_arguments(report_fixtures.carried(self.report, self.root, A),
+                                                         self.root, A),
                          ['--owner-runtime-profile', owner.SELECTOR])
 
     def test_changed_source_refused_on_replay(self):

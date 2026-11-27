@@ -17,6 +17,7 @@ BASE = fixtures.BASE
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import owner_admission_profile as owner
 import match_evidence
+import standing_premise
 
 SOURCE = '''unsigned int func_08010000(unsigned int choose, unsigned int value)
 {
@@ -186,7 +187,7 @@ class CompilerAdmissionTests(unittest.TestCase):
         self.assertEqual(owner.selector_for_report(report), owner.ACYCLIC_SELECTOR)
         result = owner.build(self.root, self.A, selector=owner.ACYCLIC_SELECTOR)
         self.assertEqual(result[8], raw)
-        self.assertEqual(owner.render(self.A, result), report)
+        self.assertEqual(owner.render(self.A, result), standing_premise.strip(report, self.root, self.A))
         wrong = copy.deepcopy(result[1])
         wrong['proof']['state_budget'] -= 1
         with self.assertRaisesRegex(ValueError, 'manifest differs'):

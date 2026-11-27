@@ -1,6 +1,7 @@
 """New synthetic integration boundaries only; no original compiler/ROM workflow."""
 import argparse
 import copy
+import report_fixtures
 import contextlib
 import io
 import json
@@ -134,8 +135,9 @@ class IntegrationTests(unittest.TestCase):
 
     def test_saved_report_dispatch_replays_exact_selector_and_manifest(self):
         r=result();report=owner.render(A,r)
+        report_fixtures.rom_image(self,r[6])
         with patch.object(owner,'build',return_value=r) as build:
-            self.assertTrue(match_evidence.report_matches(report,CASE/'scratch',A))
+            self.assertTrue(match_evidence.report_matches(report_fixtures.carried(report, CASE/'scratch', A), CASE/'scratch', A))
         self.assertEqual(build.call_count,1)
         self.assertEqual(build.call_args.kwargs,dict(expected=r[1],selector=r7.SELECTOR))
 

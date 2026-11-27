@@ -17,6 +17,7 @@ BASE = match.ROM_BASE
 import ignored_leaf_alias_profile as ignored
 import owner_admission_profile as owner
 import match_evidence
+import standing_premise
 
 CALLER = ('push {lr}\nsub sp, #8\nmov r1, sp\nmovs r0, #0\n'
           'bl callee\nadd sp, #8\npop {r1}\nbx r1')
@@ -265,7 +266,7 @@ class CompilerLifecycleTests(unittest.TestCase):
         self.assertEqual(owner.selector_for_report(report),ignored.SELECTOR)
         result=owner.build(self.root,self.A,selector=ignored.SELECTOR)
         self.assertEqual(result[8],raw)
-        self.assertEqual(owner.render(self.A,result),report)
+        self.assertEqual(owner.render(self.A,result),standing_premise.strip(report,self.root,self.A))
         discarded=result[1]['proof']['ignored_leaf_aliases']['discarded_aliases']
         self.assertTrue(discarded)
         self.assertTrue(all(record[2]==['r1']for record in discarded))

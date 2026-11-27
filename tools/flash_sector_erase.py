@@ -14,6 +14,7 @@ import flash_program_byte as program
 import flash_bank_command as bank
 import library_units as units
 import match
+import standing_premise
 
 BASE = bank.BASE
 OWNER, END = 0x08141F2C, 0x08141FC8
@@ -383,7 +384,9 @@ def replay_member(report, root, address, owner, schema):
             checked = subprocess.run([sys.executable,'-B',str(Path(match.__file__).resolve()),'--root',str(capture),
                 '--unit-toolchain',TOOL,f'0x{owner:08X}'],cwd=capture,env=env,stdin=subprocess.DEVNULL,
                 capture_output=True,timeout=90)
-            return (checked.returncode == 0 and (capture/f'docs/match/{owner:08X}.md').read_text() == report and
-                    inputs() == (files,rom))
+            # match.py carries the standing frame premise line; report_matches has already checked and
+            # removed it from `report`, so it is checked and removed from the reissued report too.
+            reissued = standing_premise.strip((capture/f'docs/match/{owner:08X}.md').read_text(), capture, owner)
+            return (checked.returncode == 0 and reissued == report and inputs() == (files,rom))
     except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
         return False

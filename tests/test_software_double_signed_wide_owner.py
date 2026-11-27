@@ -1,6 +1,7 @@
 """Signed 64-bit conversion, its original compiler member, and the binary64 ABI."""
 
 import copy
+import report_fixtures
 from contextlib import redirect_stdout
 import hashlib
 import io
@@ -60,7 +61,7 @@ class SignedWideToDoubleTests(unittest.TestCase):
             self.assertEqual(match.main(), 0)
         report = (self.root / "docs/match/081428E4.md").read_text()
         self.assertIn(f"{END-START}/{END-START} bytes", report)
-        self.assertTrue(profile.report_matches(report, self.root, START))
+        self.assertTrue(profile.report_matches(report_fixtures.uncarried(report), self.root, START))
         self.assertFalse(profile.report_matches(report.replace("__muldf3", "__adddf3"), self.root, START))
         source.write_text("#define GLUE(a,b) a ## b\nextern double GLUE(__float,sidf)(int);\n" + SOURCE)
         self.assertFalse(profile.report_matches(report, self.root, START))

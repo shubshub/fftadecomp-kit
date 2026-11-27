@@ -1,5 +1,6 @@
 """Exact target-state wide multiplication/division composition; no other wide runtime."""
 import copy
+import report_fixtures
 import hashlib
 import itertools
 import json
@@ -68,7 +69,7 @@ class SoftwareDoubleWideTests(fixture.SoftwareDoubleTests):
         report=self.native_report()
         opening,reading=self.patched_rom()
         with opening,reading:
-            self.assertTrue(profile.report_matches(report,self.root,BASE))
+            self.assertTrue(profile.report_matches(report_fixtures.uncarried(report),self.root,BASE))
             self.assertFalse(profile.report_matches(
                 report.replace('"__divdi3"]','"__muldi3"]'),self.root,BASE))
             path=self.root/'src/08000000.c'

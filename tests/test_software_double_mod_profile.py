@@ -1,5 +1,6 @@
 """Native canonical double arithmetic and bounded signed remainder composition."""
 import copy
+import report_fixtures
 import json
 import unittest
 from unittest.mock import patch
@@ -34,7 +35,7 @@ class SoftwareDoubleModTests(fixture.SoftwareDoubleTests):
         report = self.native_report()
         opening, reading = self.patched_rom()
         with opening, reading:
-            self.assertTrue(profile.report_matches(report, self.root, BASE))
+            self.assertTrue(profile.report_matches(report_fixtures.uncarried(report), self.root, BASE))
             (self.root/'src/08000000.c').write_text(SOURCE.replace('% 7', '% 9'))
             self.assertFalse(profile.report_matches(report, self.root, BASE))
 
@@ -58,7 +59,7 @@ int func_08000000(double value) {
         report=self.native_report()
         opening,reading=self.patched_rom()
         with opening,reading:
-            self.assertTrue(profile.report_matches(report,self.root,BASE))
+            self.assertTrue(profile.report_matches(report_fixtures.uncarried(report),self.root,BASE))
         for assembly in (
             "push {lr}\nsub sp,#4\nbl __adddf3\nbl __fixdfsi\n"
             "lsls r0,r0,#16\nasrs r0,r0,#16\nmovs r1,#7\nbl __modsi3\npop {r1}\nbx r1",
@@ -193,7 +194,7 @@ int func_08000000(double value) { return (short)(int)(value+(double)samples[1])%
         report=self.native_report()
         opening,reading=self.patched_rom()
         with opening,reading:
-            self.assertTrue(profile.report_matches(report,self.root,BASE))
+            self.assertTrue(profile.report_matches(report_fixtures.uncarried(report),self.root,BASE))
             path=self.root/'config/data_symbols.json'
             raw=path.read_bytes()
             path.write_text('{"samples":"0x08394354"}')

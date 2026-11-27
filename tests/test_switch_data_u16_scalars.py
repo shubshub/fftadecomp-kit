@@ -409,7 +409,7 @@ class ReportTests(unittest.TestCase):
         report = self.report()
         self.assertTrue(self.valid(report))
         with mock.patch.object(evidence.empty_body, "has_empty_body", return_value=False):
-            self.assertTrue(evidence.report_matches(report, self.root, BASE))
+            self.assertTrue(evidence.report_matches(report_fixtures.carried(report, self.root, BASE), self.root, BASE))
 
     def test_source_and_both_header_locations_are_bound(self):
         report = self.report()
@@ -484,7 +484,7 @@ class ReportTests(unittest.TestCase):
     def test_rebuild_restores_scalar_selector(self):
         import rebuild
         self.enterContext(mock.patch.object(evidence.empty_body, "has_empty_body", return_value=False))
-        self.assertEqual(rebuild.saved_profile_arguments(self.report(), self.root, BASE),
+        self.assertEqual(rebuild.saved_profile_arguments(report_fixtures.carried(self.report(), self.root, BASE), self.root, BASE),
                          ["--switch-data-profile", evidence.SWITCH_U16_SCALAR_SELECTOR])
         with self.assertRaisesRegex(ValueError, "invalid saved profile report"):
             rebuild.saved_profile_arguments(self.report().replace(
@@ -492,7 +492,7 @@ class ReportTests(unittest.TestCase):
 
     def test_status_restores_scalar_selector_for_read_only_and_write_verification(self):
         status, report, output = self.prepare_status()
-        self.assertTrue(evidence.report_matches(report.read_text(), self.root, BASE))
+        self.assertTrue(evidence.report_matches(report_fixtures.carried(report.read_text(), self.root, BASE), self.root, BASE))
         for write in (False, True):
             with self.subTest(write=write):
                 def invoke(command, **kwargs):

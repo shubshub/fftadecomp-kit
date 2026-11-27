@@ -1,5 +1,6 @@
 """Explicit target-state MOD composition; bounded numeric profiles stay strict."""
 import copy
+import report_fixtures
 from contextlib import redirect_stdout
 import io
 import json
@@ -82,7 +83,7 @@ class SoftwareDoubleTargetRemainderTests(division_fixture.SoftwareDoubleDivision
         self.assertNotEqual(profile.summary(self.manifest), profile.SUMMARY)
         opening, reading = self.patched_rom()
         with opening, reading:
-            self.assertTrue(profile.report_matches(report, self.root, BASE))
+            self.assertTrue(profile.report_matches(report_fixtures.uncarried(report), self.root, BASE))
             self.assertFalse(profile.report_matches(
                 report.replace(profile.summary(self.manifest), profile.SUMMARY), self.root, BASE))
             source = self.root / 'src/08000000.c'

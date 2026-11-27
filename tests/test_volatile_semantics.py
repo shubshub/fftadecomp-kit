@@ -13,6 +13,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import match
 import match_evidence
+import report_fixtures
 import plausible
 import volatile_semantics as semantics
 import synthetic_thumb_rom
@@ -945,7 +946,8 @@ class ReportRecordTests(unittest.TestCase):
         with mock.patch.object(plausible, "allowlisted_volatile_uses", return_value=[self.USES]), \
                 mock.patch.object(match, "allowlisted_volatile_semantics", side_effect=fresh), \
                 mock.patch.object(unsigned_divmod_profile, "selected", return_value=True), \
-                mock.patch.object(unsigned_divmod_profile, "report_matches", return_value=True):
+                mock.patch.object(unsigned_divmod_profile, "report_matches", return_value=True), \
+                report_fixtures.premise_line_checked_elsewhere():
             return match_evidence.report_matches(report, "/nonexistent", 0x08028C34)
 
     def test_semantic_record_is_recomputed_and_must_be_unaltered(self):

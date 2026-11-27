@@ -1,5 +1,6 @@
 """Exact inert error-halting paths compose with canonical binary64 calls."""
 import copy
+import report_fixtures
 import io
 from contextlib import redirect_stdout
 import json
@@ -79,7 +80,7 @@ class SoftwareDoubleSpinTests(unittest.TestCase):
         self.assertFalse(match.inert_spin.selected(report))
         opening, reading = self.patched_rom()
         with opening, reading:
-            self.assertTrue(profile.report_matches(report,self.root,BASE))
+            self.assertTrue(profile.report_matches(report_fixtures.uncarried(report),self.root,BASE))
             self.assertFalse(profile.report_matches(report.replace(match.inert_spin.CONTROL_FLOW,
                                           'closed leaf CFG'),self.root,BASE))
             path=self.root/'src/08000000.c'
@@ -127,7 +128,7 @@ class SoftwareDoubleSpinTests(unittest.TestCase):
         self.assertNotIn(profile.INERT_SPIN_SCHEMA,report)
         opening,reading=self.patched_rom()
         with opening,reading:
-            self.assertTrue(profile.report_matches(report,self.root,BASE))
+            self.assertTrue(profile.report_matches(report_fixtures.uncarried(report),self.root,BASE))
             self.assertFalse(profile.report_matches(report+'\n* inert spins: forged',self.root,BASE))
         with self.assertRaisesRegex(ValueError,'requires a reachable nonreturning'):
             match.verify_leaf_instructions(self.body,BASE,True,self.calls,

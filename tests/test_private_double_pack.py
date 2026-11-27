@@ -13,6 +13,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import match
+import report_fixtures
 import private_double_pack_effects_inventory as inventory
 import private_float_pack_admission_profile as admission
 import software_float_profile as runtime
@@ -213,7 +214,7 @@ class DoublePackTests(unittest.TestCase):
                 self.assertEqual(result['body'], selected[0])
                 report = admission.render(result)
                 self.assertEqual(admission.selector_for_report(report), SELECTOR)
-                self.assertTrue(old.evidence.report_matches(report, root, A))
+                self.assertTrue(old.evidence.report_matches(report_fixtures.carried(report, root, A), root, A))
 
     def test_status_replay_preserves_double_pack_selector(self):
         case = status_fixtures.StatusPrivateFloatRoutingTests()

@@ -21,7 +21,9 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import match
+import standing_premise
 import match_evidence
+import report_fixtures
 import plausible
 import addressed_signed_runtime_profile as addressed
 import owner_admission_profile as owner
@@ -145,7 +147,8 @@ class AddressedRuntimeRecordTests(unittest.TestCase):
             lines = report.split("\n")
             anchor = lines.index("* source plausibility: plausible")
             self.assertEqual(lines[anchor + 1:anchor + 3], records)
-            self.assertEqual(report, match_evidence.carry_volatile_records(addressed.render(result), records))
+            self.assertEqual(standing_premise.strip(report, root, A),
+                             match_evidence.carry_volatile_records(addressed.render(result), records))
             printed = output.splitlines()
             self.assertLess(printed.index(f"volatile semantics{SEMANTICS.split('semantics', 1)[1]}"),
                             printed.index("verdict MATCH - byte identical"))
@@ -241,7 +244,8 @@ class AddressedRuntimeRecordTests(unittest.TestCase):
                 patch.object(match, "allowlisted_volatile_semantics", side_effect=AssertionError("unused")):
             status, output = run_main(self.argv(root))
         self.assertEqual(status, 0, output)
-        self.assertEqual((root / f"docs/match/{A:08X}.md").read_text(), addressed.render(result))
+        self.assertEqual(standing_premise.strip((root / f"docs/match/{A:08X}.md").read_text(), root, A),
+                         addressed.render(result))
 
 
 SELECTOR = owner.ACYCLIC_SELECTOR
@@ -268,6 +272,7 @@ class OwnerRuntimeRecordTests(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         root = Path(directory.name)
         header_user(root, body)
+        report_fixtures.rom_holding(self, OwnerRuntimeRecordTests.DATA, A)
         return root
 
     def profile(self):
@@ -281,9 +286,11 @@ class OwnerRuntimeRecordTests(unittest.TestCase):
     def check_report(self, root, semantic_records):
         records = uses(root) + semantic_records
         report = (root / f"docs/match/{A:08X}.md").read_text()
-        self.assertEqual(report, match_evidence.carry_volatile_records(owner_report(self.DATA), records))
+        self.assertEqual(report, report_fixtures.carried(
+            match_evidence.carry_volatile_records(owner_report(self.DATA), records), root, A))
         self.assertTrue(match_evidence.report_matches(report, root, A))
-        self.assertFalse(match_evidence.report_matches(owner_report(self.DATA), root, A))
+        self.assertFalse(match_evidence.report_matches(report_fixtures.carried(owner_report(self.DATA), root, A),
+                                                       root, A))
         self.assertFalse(match_evidence.report_matches(without(report, "* allowlisted volatile semantics"), root, A))
         self.assertFalse(match_evidence.report_matches(report.replace("agrees on", "agrees  on"), root, A))
         changed = root / ENTRY["header"]

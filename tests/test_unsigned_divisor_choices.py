@@ -5,6 +5,7 @@ The full caller CFG, must-definition joins, thunk identity, saved frame,
 manifest binding, and report parser execute unchanged.
 """
 import copy
+import report_fixtures
 import json
 from pathlib import Path
 import struct
@@ -233,7 +234,7 @@ class UnsignedDivisorChoicesTests(unittest.TestCase):
         with patch.object(evidence, 'report_rom_path', return_value=rom_path), \
                 patch.object(thunks, 'verify_source', return_value=True):
             self.assertTrue(thunks.report_matches(report, root, A))
-            self.assertTrue(evidence.report_matches(report, root, A))
+            self.assertTrue(evidence.report_matches(report_fixtures.carried(report, root, A), root, A))
             bad_sets = copy.deepcopy(self.manifest)
             bad_sets['divisor_choices'][0][1] = [40]
             for bad in (self.report(root, bad_sets), self.report(root, schema=profile.SCHEMA),

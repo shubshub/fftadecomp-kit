@@ -1,6 +1,7 @@
 import argparse
 import contextlib
 import copy
+import report_fixtures
 import hashlib
 import io
 import json
@@ -202,7 +203,7 @@ class RealSourceTests(unittest.TestCase):
                 indent=2) + "\n")
 
     def build_report(self):
-        return profile.render_report(ADDRESS, profile._build_from_source(self.root, ADDRESS))
+        return report_fixtures.carried(profile.render_report(ADDRESS, profile._build_from_source(self.root, ADDRESS)), self.root, ADDRESS)
 
     def install_fixture(self, original):
         linked, body = ordinary_link(self.root, original)
@@ -241,7 +242,7 @@ class RealSourceTests(unittest.TestCase):
                 self.assertEqual(len(bad_records), len(good_records) + 1)
                 with patch.object(profile, "_compile_object", side_effect=self.inject_object(good)):
                     report = self.build_report()
-                    self.assertTrue(match_evidence.report_matches(report, self.root, ADDRESS))
+                    self.assertTrue(match_evidence.report_matches(report_fixtures.carried(report, self.root, ADDRESS), self.root, ADDRESS))
                 with patch.object(profile, "_compile_object", side_effect=self.inject_object(bad)) as compiled, \
                         patch.object(match_evidence, "switch_report_matches") as legacy:
                     self.assertFalse(match_evidence.report_matches(report, self.root, ADDRESS))
@@ -372,7 +373,7 @@ class RealSourceTests(unittest.TestCase):
             profile._active.reset(token)
         with patch.object(shutil, "which", return_value=None):
             self.assertFalse(match_evidence.report_matches(report, self.root, ADDRESS))
-        self.assertTrue(match_evidence.report_matches(report, self.root, ADDRESS))
+        self.assertTrue(match_evidence.report_matches(report_fixtures.carried(report, self.root, ADDRESS), self.root, ADDRESS))
 
     def test_plausibility_allowance_and_captured_checker_fail_closed(self):
         report = self.build_report()
@@ -558,8 +559,8 @@ class RealSourceTests(unittest.TestCase):
         manifest["constants"][0][2] = [manifest["constants"][1][2][0]]
         forged = profile.VerifiedSwitch(result.body, profile.canonical(manifest), result.instruction_count,
             result.source_path, result.source_digest, result.mapping_digest, result.index_digest, result.rom_digest)
-        self.assertFalse(match_evidence.report_matches(profile.render_report(ADDRESS, forged), self.root, ADDRESS))
-        stripped = profile.render_report(ADDRESS, result)
+        self.assertFalse(match_evidence.report_matches(report_fixtures.carried(profile.render_report(ADDRESS, forged), self.root, ADDRESS), self.root, ADDRESS))
+        stripped = report_fixtures.carried(profile.render_report(ADDRESS, result), self.root, ADDRESS)
         stripped = "\n".join(line for line in stripped.splitlines()
                              if not line.startswith("* switch constants"))
         stripped = stripped.replace(profile.SCHEMA, match_evidence.SWITCH_SCHEMA)
@@ -571,7 +572,7 @@ class RealSourceTests(unittest.TestCase):
 
     def test_rebuild_selector_forwarding_is_explicit_and_terminal(self):
         report = self.build_report()
-        self.assertEqual(rebuild.saved_profile_arguments(report, self.root, ADDRESS),
+        self.assertEqual(rebuild.saved_profile_arguments(report_fixtures.carried(report, self.root, ADDRESS), self.root, ADDRESS),
                          ["--switch-profile", profile.SELECTOR])
         with patch.object(profile, "report_matches", return_value=False), self.assertRaises(ValueError):
             rebuild.saved_profile_arguments(report, self.root, ADDRESS)

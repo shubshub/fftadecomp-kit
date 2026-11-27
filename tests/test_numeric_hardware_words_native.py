@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import bios_cpuset_fill_profile as cpuset
 import bios_fast_fill_source_profile as fast
 import match
+import report_fixtures
 import match_evidence
 import named_data_buffer_profile as buffers
 import owner_admission_profile as owner
@@ -88,7 +89,7 @@ class NumericHardwareWordNativeTests(unittest.TestCase):
                     if selector == buffers.BIOS_FILL_SELECTOR:
                         self.assertEqual([word[1] for word in proof['bios_scalar_control_words']], [0x05000100])
                     report = owner.render(A, result)
-                    self.assertTrue(match_evidence.report_matches(report, root, A))
+                    self.assertTrue(match_evidence.report_matches(report_fixtures.carried(report, root, A), root, A))
                     text = json.dumps(row, separators=(',', ':'))
                     self.assertIn(text, report)
                     for forged in (text.replace(str(0x0600B1E0), str(0x0600B1E4)),

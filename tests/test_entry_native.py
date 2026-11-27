@@ -9,6 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 import match
+import report_fixtures
 import owner_admission_profile as owner
 import entry_recursive_ordinary_call_profile as entry
 from synthetic_entry_owner import ADDRESS as A, HELPER as H, body, bl, snapshots
@@ -312,8 +313,9 @@ class EntryBuildRoutingTests(unittest.TestCase):
         import match_evidence as evidence
         import status
         result=self.result();report=owner.render(A,result)
+        report_fixtures.rom_image(self,result[6])
         with patch.object(owner,'report_matches',return_value=True) as replay:
-            self.assertTrue(evidence.report_matches(report,Path('/synthetic'),A))
+            self.assertTrue(evidence.report_matches(report_fixtures.carried(report, Path('/synthetic'), A), Path('/synthetic'), A))
             replay.assert_called_once_with(report,Path('/synthetic'),A)
         with self.tree() as root:
             directory=root/'docs/match';directory.mkdir(parents=True)

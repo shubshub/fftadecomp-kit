@@ -38,6 +38,9 @@ class StatusPrivateFloatRoutingTests(unittest.TestCase):
         (self.root / 'config/functions.json').write_text(json.dumps([
             {'rom': f'0x{ADDRESS:08X}', 'end': f'0x{ADDRESS + 8:08X}', 'mode': 'thumb'}]))
         (self.root / f'src/{ADDRESS:08X}.c').write_text('/* synthetic; never compiled */\n')
+        # the ROM holding BODY, which the standing frame premise check reads (frameless: no line)
+        (self.root / 'baserom.bin').write_bytes(bytes.fromhex(BODY))
+        self.enterContext(patch.dict(os.environ, {'FFTA_ROM': str(self.root / 'baserom.bin')}))
         self.report_path = self.root / f'docs/match/{ADDRESS:08X}.md'
         self.report_path.write_text(REPORT)
 

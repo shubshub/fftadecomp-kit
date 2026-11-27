@@ -361,7 +361,7 @@ class UnsignedThunkFrameSourceTests(unittest.TestCase):
         with patch.object(evidence, 'report_rom_path', return_value=rom_path), \
                 patch.object(thunks, 'verify_source', return_value=True):
             self.assertTrue(thunks.report_matches(report, root, A))
-            self.assertTrue(evidence.report_matches(report, root, A))
+            self.assertTrue(evidence.report_matches(report_fixtures.carried(report, root, A), root, A))
             record = copy.deepcopy(self.manifest)
             record['stack_frame']['frame']['maximum_frame_bytes'] += 4
             tampered = [

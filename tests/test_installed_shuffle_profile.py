@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import installed_copy_effects as installed
 import installed_shuffle_profile as shuffle
 import match
+import standing_premise
 import match_evidence
 import signed_divmod_profile as driver
 import status
@@ -290,7 +291,7 @@ class NativeTests(unittest.TestCase):
         with patch.object(sys, 'argv', options), redirect_stdout(io.StringIO()):
             self.assertEqual(match.main(), 0)
         report = (self.root / 'docs/match/08132064.md').read_text()
-        self.assertEqual(report, driver.render(self.result))
+        self.assertEqual(standing_premise.strip(report, self.root, 0x08132064), driver.render(self.result))
         self.assertEqual(self.result['instructions'], 57)
         self.assertEqual(len(self.result['body']), 132)
         self.assertEqual(self.result['manifest']['rng']['range'], [0, 32767])

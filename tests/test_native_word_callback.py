@@ -17,6 +17,7 @@ BASE=HERE.parents[1]
 sys.dont_write_bytecode=True
 sys.path[:0]=[str(HERE/'tools'),str(BASE/'repos/fftadecomp-kit/tools')]
 import match
+import report_fixtures
 import owner_admission_profile as owner
 import word_result_callback_profile as selected
 import static_callback_target_preservation_profile as r7
@@ -254,7 +255,7 @@ class NativeWordCallbackLifecycleTests(unittest.TestCase):
             report=(root/'docs/match'/f'{ROOT:08X}.md').read_text()
             self.assertIn('verdict MATCH',stdout.getvalue())
             self.assertEqual(owner.selector_for_report(report),selected.SELECTOR)
-            self.assertTrue(evidence.report_matches(report,root,ROOT))
+            self.assertTrue(evidence.report_matches(report_fixtures.carried(report, root, ROOT), root, ROOT))
             self.assertEqual(len(runner.commands),4)
             altered=report.replace('"abi_conditional":"ordinary-arm-normal-return-r0-word-v1"','"abi_conditional":"forged"',1)
             self.assertFalse(evidence.report_matches(altered,root,ROOT))

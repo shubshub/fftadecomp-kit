@@ -13,6 +13,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 import match
+import report_fixtures
 import match_evidence
 import owner_admission_profile as owner
 import descriptor_disjunctive_alias_profile as profile
@@ -74,7 +75,7 @@ class NativeTests(unittest.TestCase):
         cls.temporary=tempfile.TemporaryDirectory(prefix='descriptor_alternatives_',dir=scratch)
         cls.root=Path(cls.temporary.name);cls.data,cls.bindings,cls.original=fixture(cls.root)
         cls.environment=patch.dict(os.environ,FFTA_ROM=str(cls.root/'baserom.bin'));cls.environment.start()
-        cls.result=owner.build(cls.root,A,selector=profile.SELECTOR);cls.report=owner.render(A,cls.result)
+        cls.result=owner.build(cls.root,A,selector=profile.SELECTOR);cls.report=report_fixtures.carried(owner.render(A,cls.result),cls.root,A)
 
     @classmethod
     def tearDownClass(cls):
@@ -102,7 +103,7 @@ class NativeTests(unittest.TestCase):
             ids={state['id'] for state in row['states']}
             self.assertTrue(all(first in ids and second in ids for first,second in row['edges']))
             self.assertTrue(all(result['state'] in ids for result in row['returns']))
-        self.assertTrue(match_evidence.report_matches(self.report,self.root,A))
+        self.assertTrue(match_evidence.report_matches(report_fixtures.carried(self.report, self.root, A), self.root, A))
         command=[sys.executable,str(Path(match.__file__)), '--root',str(self.root),f'{A:08X}',
                  '--owner-runtime-profile',profile.SELECTOR]
         native=subprocess.run(command,capture_output=True,text=True)

@@ -22,6 +22,7 @@ sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import match
+import report_fixtures
 import match_evidence
 import named_data_buffer_profile as named
 import owner_admission_profile as owner
@@ -332,7 +333,7 @@ class NativeTests(unittest.TestCase):
                                r'sites 0x[0-9A-F]{8} writes sp\+0:2 sp\+2:2 sp\+4:2 sp\+6:2; '
                                r'proved none; trusted 0x08000600:r\d+; pruned edges \d+$')
         self.assertTrue(self.replay())
-        self.assertTrue(match_evidence.report_matches(self.report, self.root, A))
+        self.assertTrue(match_evidence.report_matches(report_fixtures.carried(self.report, self.root, A), self.root, A))
 
     def test_a_callee_only_the_aborted_joined_pass_inspected_is_not_in_the_manifest(self):
         dependencies = [row['address'] for row in self.result[1]['proof']['buffers']['dependencies']]
@@ -347,7 +348,7 @@ class NativeTests(unittest.TestCase):
         with patch.dict(os.environ, FFTA_ROM=str(self.straight / 'baserom.bin')):
             result = owner.build(self.straight, A, selector=named.SELECTOR)
             report = owner.render(A, result)
-            self.assertTrue(match_evidence.report_matches(report, self.straight, A))
+            self.assertTrue(match_evidence.report_matches(report_fixtures.carried(report, self.straight, A), self.straight, A))
             buffers = result[1]['proof']['buffers']
             self.assertEqual([row['address'] for row in buffers['dependencies']], [B])
             self.assertNotIn('loop_replay', buffers)
@@ -389,7 +390,7 @@ class NativeTests(unittest.TestCase):
             with self.subTest(edit=edits.index(edited)):
                 self.assertNotEqual(edited, self.report)
                 self.assertFalse(match_evidence.report_matches(edited, self.root, A))
-        self.assertTrue(match_evidence.report_matches(self.report, self.root, A))
+        self.assertTrue(match_evidence.report_matches(report_fixtures.carried(self.report, self.root, A), self.root, A))
 
     def test_replay_record_is_required_and_exact(self):
         for change in ('drop', 'lines', 'premise'):

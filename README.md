@@ -934,6 +934,45 @@ Framed reports use `elf-symbol-thumb-frame-v1` or
 The linked variant also requires the usual mapping fingerprint and call
 summary. Existing unframed schemas remain accepted without report churn.
 
+### Standing frame premise
+
+The frame proof protects the saved registers, the saved return address and the frame words whose
+contents the walk relies on only against the stores it can place: through SP, and through a tracked
+stack alias, in the root walk and in every walked callee. A store through any other base is not
+checked, and a call or SWI is walked only when a frame address reaches it. Inside walked code every
+SP-derived value is tracked, and an escape is refused or premised by its own line. That a pointer from
+outside (an incoming argument, a word read from memory, a result of code that is not walked, an
+absolute address) never addresses the live frame, and that code the walk does not inspect does not
+write it, is assumed, not proved. This holds on every framed walk, buffer proof or not, so every MATCH
+report whose function holds a frame word states it, directly after its `* verification:` line:
+
+```
+* frame premise: `untracked-pointer-frame-v1`; unproved premise: no pointer the walk does not derive from SP (an incoming argument, a word read from memory, a result of code the walk does not inspect, or an absolute address) addresses stack that this function or a callee the walk inspects has allocated, except an escaped address used only as an escape premise of this report states; and no code the walk does not inspect (a callee, the BIOS, DMA or an interrupt handler) writes that stack other than the stack arguments it is passed, except as a summary or premise line of this report states
+```
+
+Its exceptions defer to what the report's own lines state: an escaped address that an escape premise
+covers, the stack arguments a callee is passed (which it may write), and any write a summary line or a
+premise line (an escape premise, a call-via premise) allows.
+
+A function holds a frame word when code reachable from its entry writes SP (`tools/standing_premise.py`,
+`holds_frame`): a push, a pop, an SP adjustment or a move to SP. The test follows fallthrough, B and Bcc
+targets and local BL long branches inside the span, and is conservatively true when it reaches code it
+cannot decode or follow (a computed PC write, running off the span) or when `config/functions.json`
+gives no unique mode for the address. A frameless function's report carries no line. A frameless
+function has no frame word for the premise to protect.
+
+The line is carried centrally, so no report writer can omit it. `match.py` adds it to the report its own
+writer renders, before `--check-report` compares and before it writes. It adds it to the report a
+selector's writer wrote, as `issue_with_volatile_records` does for volatile records.
+`match_evidence.report_matches` requires it exactly once, verbatim, in its place, iff the premise
+applies, and none otherwise, and removes it before any schema replay runs; the report's `* ROM bytes:`
+line must equal the ROM every replay reads. Every schema replay sees exactly the text it saw before.
+`issued_report_pins` runs only after `--check-report` has found the whole saved text, line included,
+identical to the one `match.py` writes now, so it reads the report without the line. The line is bound by recomputation and whole-text
+comparison, as the callee-saved premise lines are; it is in no proof digest. A rule that keeps a fact
+across stores the walk cannot place calls `standing_premise.require` and names
+`untracked-pointer-frame-v1` in its own fingerprinted evidence.
+
 ### Callee-saved registers holding stack addresses (kit #350)
 
 Where the walk has a buffer proof, and in the stack-index analysis, a call made
@@ -2333,8 +2372,9 @@ Report replay recomputes the proof, the lines and the fingerprint, and reads
 `symbols/functions.txt` for the helper identity. Not proved: that a source or
 destination that is not local is readable or writable, or that it does not
 overlap the live frame, the helper's save words or code (the walk's standing
-premise for every untracked pointer); physical stack, lifetime and termination
-beyond the bounded run are not proved either.
+premise for every untracked pointer, which the report states in its
+`* frame premise:` line; see "Standing frame premise"); physical stack,
+lifetime and termination beyond the bounded run are not proved either.
 
 The typed-data proof beside the version-2 walk (`data_buffer_profile`) builds
 the same plain proof for its plain path, and takes the same index from

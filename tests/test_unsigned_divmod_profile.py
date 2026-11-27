@@ -18,6 +18,7 @@ STAGED = Path(__file__).resolve().parents[1]
 PRODUCTION = Path(os.environ.get('FFTA_TEST_PRODUCTION_KIT', STAGED))
 sys.path[:0] = [str(STAGED/'tools'), str(PRODUCTION/'tools')]
 import match
+import report_fixtures
 import match_evidence as evidence
 import owner_admission_profile as owner
 import unsigned_divmod_profile as profile
@@ -298,7 +299,7 @@ class UnsignedDivmodCompositionTests(unittest.TestCase):
 
     def test_09_status_and_publisher_delegate_exact_explicit_selector(self):
         with self.build_fixture() as (f,commands,compiler):
-            report=profile.render(profile.build(self.root,A));path=self.root/f'docs/match/{A:08X}.md';path.write_text(report)
+            report=report_fixtures.carried(profile.render(profile.build(self.root,A)),self.root,A);path=self.root/f'docs/match/{A:08X}.md';path.write_text(report)
             self.assertEqual(status.collect(str(self.root),verify=False)[:4],(4,1,346,32))
             output=f'extent    {len(f["data"])} bytes\nverdict MATCH - byte identical\n'
             for write in (False,True):
@@ -315,7 +316,7 @@ class UnsignedDivmodCompositionTests(unittest.TestCase):
 
     def test_10_stale_report_or_failed_process_cannot_count(self):
         with self.build_fixture() as (f,commands,compiler):
-            report=profile.render(profile.build(self.root,A));path=self.root/f'docs/match/{A:08X}.md';path.write_text(report)
+            report=report_fixtures.carried(profile.render(profile.build(self.root,A)),self.root,A);path=self.root/f'docs/match/{A:08X}.md';path.write_text(report)
             def invoke(command,**kwargs):
                 path.write_text(report.replace('structural unsigned','forged unsigned'))
                 return subprocess.CompletedProcess(command,0,f'extent    {len(f["data"])} bytes\nverdict MATCH - byte identical\n','')

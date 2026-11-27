@@ -19,6 +19,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(TOOLS))
 import addressed_signed_runtime_profile as profile
 import match
+import standing_premise
 import match_evidence as evidence
 
 A, B = 0x08010000, 0x08011000
@@ -264,7 +265,8 @@ class TwoReadonlyWordsTests(unittest.TestCase):
                         redirect_stdout(io.StringIO()):
                     self.assertEqual(match.main(), 0)
                 self.assertEqual(build.call_args.kwargs['selector'], profile.READONLY_TWO_SELECTOR)
-                self.assertEqual((root / 'docs/match/08010000.md').read_text(), profile.render(result))
+                self.assertEqual(standing_premise.strip((root / 'docs/match/08010000.md').read_text(), root, A),
+                                 profile.render(result))
                 args = argparse.Namespace(mode='thumb', control_flow_profile='ordinary', label=None,
                     wsl='Ubuntu', wsl_path=match.DEFAULT_WSL_PATH,
                     addressed_signed_runtime_profile=profile.READONLY_TWO_SELECTOR,

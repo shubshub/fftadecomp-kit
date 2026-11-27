@@ -1,5 +1,6 @@
 """Closed scalar-bias policy: native source replay and adversarial machine shapes."""
 import contextlib
+import report_fixtures
 import copy
 from dataclasses import replace
 import io
@@ -176,7 +177,7 @@ class OneConstantTests(unittest.TestCase):
         root, rom, _ = self.prepare()
         with self.trusted_fixture(root, rom):
             result = profile._build_from_source(root, ADDRESS, self.policy)
-            report = profile.render_report(ADDRESS, result, self.policy)
+            report = report_fixtures.carried(profile.render_report(ADDRESS, result, self.policy), root, ADDRESS)
             for name in ('src/08000000.c', 'config/functions.json', 'symbols/functions.txt'):
                 path = root / name
                 old = path.read_bytes()
@@ -195,14 +196,14 @@ class OneConstantTests(unittest.TestCase):
                 self.assertFalse(match_evidence.report_matches(report, root, ADDRESS))
             changed = json.loads(result.manifest_json)
             changed['placement']['original_elf_sha256'] = '0' * 64
-            stale = profile.render_report(ADDRESS, replace(result, manifest_json=profile.canonical(changed)), self.policy)
+            stale = report_fixtures.carried(profile.render_report(ADDRESS, replace(result, manifest_json=profile.canonical(changed)), self.policy), root, ADDRESS)
             self.assertFalse(match_evidence.report_matches(stale, root, ADDRESS))
 
     def test_strict_schema_no_fallback_or_report_field_laundering(self):
         root, rom, _ = self.prepare()
         with self.trusted_fixture(root, rom):
             result = profile._build_from_source(root, ADDRESS, self.policy)
-            report = profile.render_report(ADDRESS, result, self.policy)
+            report = report_fixtures.carried(profile.render_report(ADDRESS, result, self.policy), root, ADDRESS)
             changes = [report.replace(self.policy.schema, profile.FRAME_POLICY.schema),
                 report.replace(self.policy.selector, profile.FRAME_POLICY.selector),
                 report.replace(self.policy.schema, self.policy.schema + '-future'),
@@ -213,11 +214,11 @@ class OneConstantTests(unittest.TestCase):
             for field in ('constants', 'frame'):
                 changed = json.loads(result.manifest_json)
                 del changed[field]
-                changes.append(profile.render_report(ADDRESS, replace(result, manifest_json=profile.canonical(changed)), self.policy))
+                changes.append(report_fixtures.carried(profile.render_report(ADDRESS, replace(result, manifest_json=profile.canonical(changed)), self.policy), root, ADDRESS))
             for field, value in [('constants', []), ('constants', [[0, 0, [0]], [4, 0, [0]]])]:
                 changed = json.loads(result.manifest_json)
                 changed[field] = value
-                changes.append(profile.render_report(ADDRESS, replace(result, manifest_json=profile.canonical(changed)), self.policy))
+                changes.append(report_fixtures.carried(profile.render_report(ADDRESS, replace(result, manifest_json=profile.canonical(changed)), self.policy), root, ADDRESS))
             for changed in changes:
                 with self.subTest(report=changed), patch.object(match_evidence, 'switch_report_matches') as fallback:
                     self.assertFalse(match_evidence.report_matches(changed, root, ADDRESS))

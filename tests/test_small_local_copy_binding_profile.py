@@ -14,6 +14,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode=True
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 import match
+import report_fixtures
 import match_evidence
 import owner_admission_profile as owner
 import small_local_copy_binding_profile as binding
@@ -103,7 +104,7 @@ class BindingTests(unittest.TestCase):
             report=owner.render(A,result)
             self.assertEqual(owner.selector_for_report(report),binding.SELECTOR)
             self.assertIn('* control flow: '+binding.CONTROL_FLOW,report)
-            self.assertTrue(match_evidence.report_matches(report,self.root,A))
+            self.assertTrue(match_evidence.report_matches(report_fixtures.carried(report, self.root, A), self.root, A))
             command=[sys.executable,str(Path(match.__file__)),hex(A),'--root',str(self.root),
                      '--owner-runtime-profile',binding.SELECTOR,'--no-write']
             process=subprocess.run(command,capture_output=True,text=True,timeout=120)

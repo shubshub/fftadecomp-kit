@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bios_cpuset_fill_profile as cpuset
 import match
+import report_fixtures
 import named_data_buffer_profile as buffers
 import match_evidence
 import owner_admission_profile as owner
@@ -445,7 +446,7 @@ class CompiledNumericOwnerTests(unittest.TestCase):
         self.assertEqual(sorted(row[1] for row in words), [0x04000004, 0x0600AE00])
         lines = [line for line in self.report.splitlines() if line.startswith(LINES)]
         self.assertEqual(len(lines), 3)
-        self.assertTrue(match_evidence.report_matches(self.report, self.root, A))
+        self.assertTrue(match_evidence.report_matches(report_fixtures.carried(self.report, self.root, A), self.root, A))
 
     def test_edited_or_dropped_lines_fail_replay(self):
         line = next(line for line in self.report.splitlines() if line.startswith(f'{LINES}: '))

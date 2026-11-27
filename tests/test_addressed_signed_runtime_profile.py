@@ -17,6 +17,7 @@ from contextlib import contextmanager
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import match
+import report_fixtures
 import match_evidence as evidence
 import status
 import push
@@ -563,7 +564,7 @@ class AddressedSignedRuntimeTests(unittest.TestCase):
                 self.assertEqual(plausible.call_args[0][0][1],str(Path(profile.__file__).with_name('plausible.py')))
                 # A fresh source replay must build again; no saved-byte shortcut.
                 report=profile.render(result);compile_call.reset_mock()
-                self.assertTrue(evidence.report_matches(report,root,A));compile_call.assert_called_once()
+                self.assertTrue(evidence.report_matches(report_fixtures.carried(report, root, A), root, A));compile_call.assert_called_once()
                 with patch.object(match,'plausibility_result',return_value=(['implausible'],None)):
                     with self.assertRaises(ValueError):profile.build(root,A)
                 saved=source.read_bytes()
@@ -773,7 +774,7 @@ class AddressedSignedRuntimeTests(unittest.TestCase):
             self.assertIn('--no-relax',commands[1])
             self.assertIn('--orphan-handling=error',commands[1])
             report=profile.render(result);compiler.reset_mock()
-            self.assertTrue(evidence.report_matches(report,root,A));compiler.assert_called_once()
+            self.assertTrue(evidence.report_matches(report_fixtures.carried(report, root, A), root, A));compiler.assert_called_once()
             self.assertIn('identity only',report)
             for relative in ('config/data_symbols.json','config/functions.json','symbols/functions.txt',
                              'src/08010000.c','baserom.bin'):

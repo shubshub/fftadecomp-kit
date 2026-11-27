@@ -12,6 +12,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import bios_bg_affine_set_profile as affine
 import match
+import report_fixtures
 import match_evidence
 import named_data_buffer_profile as buffers
 import owner_admission_profile as owner
@@ -77,7 +78,7 @@ class BgAffineSetNativeTests(unittest.TestCase):
                 result = owner.build(root, A, selector=buffers.BG_AFFINE_SELECTOR)
                 self.assertEqual(result[8], original)
                 report = owner.render(A, result)
-                self.assertTrue(match_evidence.report_matches(report, root, A))
+                self.assertTrue(match_evidence.report_matches(report_fixtures.carried(report, root, A), root, A))
                 check = subprocess.run([sys.executable, str(Path(match.__file__)),
                     '--root', str(root), f'0x{A:08X}', '--owner-runtime-profile',
                     buffers.BG_AFFINE_SELECTOR], text=True, capture_output=True)

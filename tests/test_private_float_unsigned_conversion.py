@@ -12,6 +12,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import match
+import report_fixtures
 import private_float_pack_admission_profile as admission
 import private_float_unsigned_conversion_inventory as inventory
 import software_float_profile as runtime
@@ -217,7 +218,7 @@ class UnsignedConversionTests(unittest.TestCase):
                              inventory.selected_record.ABSOLUTE_POLICY['reads'])
             report = admission.render(result)
             with patch.object(admission, 'build', return_value=result):
-                self.assertTrue(old.evidence.report_matches(report, root, A))
+                self.assertTrue(old.evidence.report_matches(report_fixtures.carried(report, root, A), root, A))
             (root/'symbols/functions.txt').write_bytes(selected[4]+b' ')
             with patch.object(admission, 'build', side_effect=AssertionError('stale context must not build')):
                 self.assertFalse(old.evidence.report_matches(report, root, A))

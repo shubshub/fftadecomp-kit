@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"tools"))
 import match
+import report_fixtures
 import match_evidence
 import plausible
 import owner_admission_profile as owner
@@ -122,7 +123,7 @@ void func_08001000(void) {
         self.assertTrue(owner.report_matches(self.report,self.root,A))
         records=match.allowlisted_volatile_semantics(self.root,A,owner_runtime_profile=SELECTOR)
         report=match_evidence.carry_volatile_records(self.report,plausible.allowlisted_volatile_uses(self.root,A)+records)
-        self.assertTrue(match_evidence.report_matches(report,self.root,A))
+        self.assertTrue(match_evidence.report_matches(report_fixtures.carried(report, self.root, A), self.root, A))
         command=[sys.executable,str(Path(match.__file__)), '--root',str(self.root),f'{A:08X}',
                  '--owner-runtime-profile',SELECTOR,'--no-write']
         output=match._run_replay_process(command,self.root,120)

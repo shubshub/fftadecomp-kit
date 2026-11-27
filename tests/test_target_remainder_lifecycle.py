@@ -1,5 +1,6 @@
 """Saved optional MOD selection survives native status/rebuild without widening defaults."""
 import copy
+import report_fixtures
 import hashlib
 import json
 import os
@@ -37,7 +38,7 @@ class TargetRemainderLifecycleTests(fixture.SoftwareDoubleTargetRemainderTests):
         report = (self.root / 'docs/match/08000000.md').read_text()
         with patch.dict(os.environ, {'FFTA_ROM':str(rom)}):
             self.assertTrue(profile.target_remainder_selected(report))
-            self.assertTrue(profile.report_matches(report, self.root, BASE))
+            self.assertTrue(profile.report_matches(report_fixtures.uncarried(report), self.root, BASE))
             self.assertEqual(rebuild.saved_profile_arguments(report, self.root, BASE), [
                 '--software-double-profile', profile.SELECTOR,
                 '--software-double-remainder-profile', profile.REMAINDER_TARGET_SELECTOR])

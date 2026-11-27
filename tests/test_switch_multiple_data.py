@@ -320,7 +320,7 @@ class ReportTests(unittest.TestCase):
             TASK, BASE, self.body, evidence.SWITCH_MULTIPLE_DATA_SCHEMA, instructions, mapped=True,
             control_flow=control_flow, data_profile=True, switches=True, switch_evidence=self.manifest)
         with mock.patch.object(evidence.empty_body, "has_empty_body", return_value=False):
-            self.assertTrue(evidence.report_matches(complete, TASK, BASE))
+            self.assertTrue(evidence.report_matches(report_fixtures.carried(complete, TASK, BASE), TASK, BASE))
             self.assertFalse(evidence.report_matches(report, TASK, BASE))
 
     def test_legacy_single_word_report_remains_valid(self):

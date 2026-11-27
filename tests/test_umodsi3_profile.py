@@ -263,7 +263,7 @@ class UnsignedRemainderTests(unittest.TestCase):
                 self.root, BASE, self.body, profile.SCHEMA, instructions, mapping=self.mapping,
                 data_mapping=self.objects, mapped=True, control_flow=evidence.CALL_SUMMARY,
                 data_profile=bool(manifest["data"]), unsigned_remainder_evidence=manifest)
-            self.assertTrue(evidence.report_matches(report, self.root, BASE))
+            self.assertTrue(evidence.report_matches(report_fixtures.carried(report, self.root, BASE), self.root, BASE))
             for changed in (report + "\n" + lines[0],
                             report.replace("-O2", "-O1"),
                             report.replace('"frame":true', '"frame":false'),

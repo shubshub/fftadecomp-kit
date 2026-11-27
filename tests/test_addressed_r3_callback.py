@@ -17,6 +17,7 @@ HERE = Path(__file__).resolve().parents[1]
 KIT = Path(os.environ.get('FFTA_R3_PRODUCTION_KIT', HERE))
 sys.path[:0] = [str(HERE / 'tools'), str(KIT / 'tools'), str(KIT / 'tests')]
 import match
+import report_fixtures
 import match_evidence as evidence
 import addressed_signed_runtime_profile as profile
 import status
@@ -349,7 +350,7 @@ class R3CallbackTests(unittest.TestCase):
     def test_status_and_native_publisher_selector_propagation(self):
         with self.build_fixture() as (root,f,commands,capture):
             result = profile.build(root,A,selector=SELECTOR)
-            (root/'docs/match/08010000.md').write_text(profile.render(result))
+            (root/'docs/match/08010000.md').write_text(report_fixtures.carried(profile.render(result),root,A))
             self.assertEqual(status.collect(str(root),verify=False)[1],1)
             output = type('Result',(),{'returncode':0,'stdout':f'extent {len(f["data"])} bytes\nverdict MATCH - byte identical\n','stderr':''})()
             with patch.object(status.subprocess,'run',return_value=output) as run:
@@ -390,7 +391,7 @@ class R3CallbackTests(unittest.TestCase):
             capture.assert_not_called()
             result = profile.build(root,A,selector=SELECTOR)
             report = profile.render(result)
-            self.assertTrue(evidence.report_matches(report,root,A))
+            self.assertTrue(evidence.report_matches(report_fixtures.carried(report, root, A), root, A))
             self.assertEqual(result['manifest']['producer_source_sha256']['addressed_signed_runtime_profile.py'],
                              hashlib.sha256(Path(profile.__file__).read_bytes()).hexdigest())
 

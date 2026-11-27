@@ -469,7 +469,7 @@ class ReportTests(unittest.TestCase):
                 report = self.report()
                 self.assertTrue(self.valid(report))
                 with mock.patch.object(evidence.empty_body, "has_empty_body", return_value=False):
-                    self.assertTrue(evidence.report_matches(report, self.root, BASE))
+                    self.assertTrue(evidence.report_matches(report_fixtures.carried(report, self.root, BASE), self.root, BASE))
 
     def test_framed_reports_revalidate_and_cannot_be_relabelled(self):
         import rebuild
@@ -480,7 +480,7 @@ class ReportTests(unittest.TestCase):
                 self.use(pool, frame=True)
                 report = self.report()
                 self.assertTrue(self.valid(report))
-                self.assertTrue(evidence.report_matches(report, self.root, BASE))
+                self.assertTrue(evidence.report_matches(report_fixtures.carried(report, self.root, BASE), self.root, BASE))
                 self.assertEqual(rebuild.saved_profile_arguments(report, self.root, BASE),
                                  ["--switch-data-profile", selector])
                 unframed = V2 if pool else V1
@@ -543,7 +543,7 @@ class ReportTests(unittest.TestCase):
                                (("object", "scalar"), evidence.SWITCH_FUNCTION_POOL_U16_SCALAR_SELECTOR)):
             with self.subTest(selector=selector):
                 self.use(pool)
-                self.assertEqual(rebuild.saved_profile_arguments(self.report(), self.root, BASE),
+                self.assertEqual(rebuild.saved_profile_arguments(report_fixtures.carried(self.report(), self.root, BASE), self.root, BASE),
                                  ["--switch-data-profile", selector])
                 with self.assertRaisesRegex(ValueError, "invalid saved profile report"):
                     rebuild.saved_profile_arguments(

@@ -1,6 +1,7 @@
 """R6 thunk selection and original-object boundaries, using synthetic code only."""
 import argparse
 import copy
+import report_fixtures
 import hashlib
 from pathlib import Path
 import struct
@@ -220,10 +221,11 @@ class TargetTests(unittest.TestCase):
             self.assertEqual(match.main(), 19)
         self.assertEqual(issue.call_args.args[2].owner_runtime_profile, policy.TARGET_SELECTOR)
         r = result(); report = owner.render(A, r)
+        report_fixtures.rom_image(self, r[6])
         self.assertEqual(owner.selector_for_report(report), policy.TARGET_SELECTOR)
         self.assertIn('* owner runtime: '+policy.TARGET_SELECTOR, report)
         with patch.object(owner, 'build', return_value=r) as build:
-            self.assertTrue(match_evidence.report_matches(report, CASE/'scratch', A))
+            self.assertTrue(match_evidence.report_matches(report_fixtures.carried(report, CASE/'scratch', A), CASE/'scratch', A))
         self.assertEqual(build.call_args.kwargs, dict(expected=r[1], selector=policy.TARGET_SELECTOR))
         pins = r[1]['proof']['buffers']['r6_restoration']['policy']['source_sha256']
         for filename, digest in pins.items():

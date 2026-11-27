@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import match
 import match_evidence
+import report_fixtures
 import plausible
 import unsigned_divmod_profile
 import volatile_semantics as semantics
@@ -188,7 +189,8 @@ class ForwardedPremiseReplayTests(unittest.TestCase):
         with mock.patch.object(plausible, "allowlisted_volatile_uses", return_value=[self.USES]), \
                 mock.patch.object(match, "allowlisted_volatile_semantics", return_value=[fresh]), \
                 mock.patch.object(unsigned_divmod_profile, "selected", return_value=True), \
-                mock.patch.object(unsigned_divmod_profile, "report_matches", return_value=True):
+                mock.patch.object(unsigned_divmod_profile, "report_matches", return_value=True), \
+                report_fixtures.premise_line_checked_elsewhere():
             return match_evidence.report_matches(report, "/nonexistent", 0x08028C34)
 
     def test_a_record_with_the_clause_removed_is_refused(self):

@@ -10,6 +10,7 @@ from unittest.mock import patch
 import test_volatile_bios_interface
 import match
 import match_evidence
+import report_fixtures
 import test_volatile_cpuset_local_source as local
 import test_volatile_semantics as fixtures
 import test_named_bios_fill_source as native
@@ -101,6 +102,7 @@ class PolicySelectionTests(unittest.TestCase):
 
     def test_cli_dispatch_and_volatile_report_replay_select_new_policy_explicitly(self):
         import test_volatile_records_all_profiles as records
+        report_fixtures.rom_holding(self, b'\x70\x47', native.A)
         for selector, schema in ((buffers.BIOS_FILL_SELECTOR, buffers.BIOS_FILL_SCHEMA),
                                  (SELECTOR, SCHEMA)):
             with patch.object(sys, 'argv', ['match.py', '--root', '.',
@@ -113,6 +115,7 @@ class PolicySelectionTests(unittest.TestCase):
             report = records.owner_report(b'\x70\x47').replace(records.owner.ACYCLIC_SCHEMA, schema)
             uses, semantic = '* allowlisted volatile: fixture', '* allowlisted volatile semantics: fixture'
             report = match_evidence.carry_volatile_records(report, [uses, semantic])
+            report = report_fixtures.carried(report, '.', native.A)
             with patch.object(match.plausibility, 'allowlisted_volatile_uses', return_value=[uses]), \
                     patch.object(match, 'allowlisted_volatile_semantics', return_value=[semantic]) as replay, \
                     patch.object(owner, 'report_matches', return_value=False):

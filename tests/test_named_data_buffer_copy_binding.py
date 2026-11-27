@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'tools'))
 import match
+import report_fixtures
 import match_evidence
 import named_data_buffer_copy_binding_profile as adapter
 import named_data_buffer_profile as buffers
@@ -206,7 +207,7 @@ class NativeTests(unittest.TestCase):
             report=owner.render(A,result)
             self.assertEqual(owner.selector_for_report(report),adapter.SELECTOR)
             self.assertIn('* control flow: '+adapter.CONTROL_FLOW,report)
-            self.assertTrue(match_evidence.report_matches(report,self.root,A))
+            self.assertTrue(match_evidence.report_matches(report_fixtures.carried(report, self.root, A), self.root, A))
             for name in ('src/08000200.c','config/functions.json','symbols/functions.txt','config/data_symbols.json'):
                 path=self.root/name;raw=path.read_bytes()
                 try:

@@ -440,7 +440,7 @@ class ReportTests(unittest.TestCase):
         report = self.report()
         self.assertTrue(self.valid(report))
         with mock.patch.object(evidence.empty_body, "has_empty_body", return_value=False):
-            self.assertTrue(evidence.report_matches(report, self.root, BASE))
+            self.assertTrue(evidence.report_matches(report_fixtures.carried(report, self.root, BASE), self.root, BASE))
 
     def test_tampered_reports_reject(self):
         report = self.report()
@@ -500,7 +500,7 @@ class ReportTests(unittest.TestCase):
     def test_rebuild_forwards_the_selector(self):
         import rebuild
         self.enterContext(mock.patch.object(evidence.empty_body, "has_empty_body", return_value=False))
-        self.assertEqual(rebuild.saved_profile_arguments(self.report(), self.root, BASE),
+        self.assertEqual(rebuild.saved_profile_arguments(report_fixtures.carried(self.report(), self.root, BASE), self.root, BASE),
                          ["--switch-data-profile", frame.SELECTOR])
         with self.assertRaisesRegex(ValueError, "invalid saved profile report"):
             rebuild.saved_profile_arguments(self.report(self.without("stack_policy")), self.root, BASE)
