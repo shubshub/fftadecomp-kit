@@ -102,7 +102,7 @@ the addressed source wherever two things hold, and refuses it otherwise.
      that never goes on, that no BL, branch, return or word enters); the
      record prints each such halfword and the premise that nothing the scan
      does not model runs it: an address formed by arithmetic, a lone BL
-     suffix, a copy in RAM or ARM code.  A branch into it, a BL from
+     prefix or suffix, a copy in RAM or ARM code.  A branch into it, a BL from
      another place than an indexed function with a matched source below
      CODE_END, its own call, and an address word other than below refuse.
      Each caller's source
@@ -1167,7 +1167,8 @@ def pool_halfword(rom, at, index):
     any ROM offset holding an address in it.  Then, by induction from first, no halfword up to `at` is reached
     by falling through, a branch, a call, a return or an address word.  That is all it proves: what the scan
     does not model for the function either could still run it (an address formed by arithmetic, a lone BL
-    suffix, which branches relative to lr, a copy in RAM, or ARM code), and the record prints that premise.
+    prefix elsewhere, which sets lr to an address of its choosing, a lone BL suffix, which branches relative to
+    lr, a copy in RAM, or ARM code), and the record prints that premise.
     index is bl_index(rom).
     """
     word = at & ~3
@@ -1469,7 +1470,7 @@ class Callers:
                           f"{', '.join(f'{load:08X}' for load in loads)}, its pool from {first:08X} follows "
                           f"{stop:08X}, which never goes on, and no BL, branch, return or word enters "
                           f"{first:08X}..{site + 1:08X}; unproved, so assumed: nothing the scan does not model runs it "
-                          "(an address formed by arithmetic, a lone BL suffix, a copy in RAM, ARM code)")
+                          "(an address formed by arithmetic, a lone BL prefix or suffix, a copy in RAM, ARM code)")
         for site, start in direct:
             base, extra = self.argument(start, site, number)
             if base.kind == "param":
