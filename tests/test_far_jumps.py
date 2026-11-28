@@ -321,6 +321,12 @@ class DefaultContextTests(unittest.TestCase):
         self.assertLessEqual(far_jump.PARAMETERS, names)
         self.assertIn("menu_list_frame", names - far_jump.PARAMETERS)
         self.assertIn("double_context", names - far_jump.PARAMETERS)
+        # Every other local-BL context comes from one of these (the owner switch's from
+        # switch_relocations), so a far-jump walk meets none of them and its local branches are
+        # exactly its far jumps.
+        self.assertLessEqual({"menu_list_frame", "switch_relocations", "double_context", "switch_outgoing_stack",
+                              "addressed_signed_runtime_context", "function_thunk_context"},
+                             names - far_jump.PARAMETERS)
 
 
 class RecordTests(unittest.TestCase):
@@ -369,6 +375,42 @@ class RecordTests(unittest.TestCase):
         self.assertEqual(sorted(states), [0x08000200, 0x08000202, 0x08000206, 0x0800020E, 0x08000210,
                                           0x08000212])
         self.assertEqual(states[0x0800020E].regs[14], analysis_profile.TOP)
+
+    def test_the_stack_index_analysis_forgets_lr_at_a_far_jump(self):
+        import stack_index_precondition_profile as analysis_profile
+        # 200 push {lr}; 202 sub sp,#8; 204 r4 = entry_R0 & 3; 20a mov r1,sp; 20c adds r1,r1,r4 (a
+        # ranged address); 20e mov lr,r1; 210 movs r1,#0; 212 bl 218 (the far jump); 216 nop;
+        # 218 add sp,#8; 21a pop {pc}.  The jump writes LR, so the ranged address it held before is
+        # gone at the return, which checks LR among the return-visible registers.
+        code = body(half(0xB500, 0xB082, 0x1C04, 0x2103, 0x400C, 0x4669, 0x1909, 0x468E, 0x2100),
+                    bl(0x08000212, 0x08000218), half(0x46C0, 0xB002, 0xBD00))
+        derivations = frozenset({0x0800020C})              # the core defers the indexed address
+        analysis = analysis_profile.Analysis(code, START, derivations, frozenset(), {})
+        analysis.far_jumps = {0x08000212: 0x08000218}
+        states = analysis.run()
+        self.assertEqual(states[0x08000218].regs[14], analysis_profile.TOP)
+        # The same address still in LR at the return escapes (the jump and its nop replaced by nops).
+        held = body(half(0xB500, 0xB082, 0x1C04, 0x2103, 0x400C, 0x4669, 0x1909, 0x468E, 0x2100),
+                    half(0x46C0, 0x46C0, 0x46C0, 0xB002, 0xBD00))
+        with self.assertRaisesRegex(ValueError, "ranged stack address escapes through a return register"):
+            analysis_profile.Analysis(held, START, derivations, frozenset(), {}).run()
+
+    def test_frame_word_identities_cross_a_far_jump(self):
+        import stack_index_frame_words_profile as frame_words
+        # 200 push {r4,lr}; 202 sub sp,#8; 204 r4 = entry_R0 & 3; 20a mov r1,sp; 20c adds r1,r1,r4;
+        # 20e movs r0,#7; 210 strb r0,[r1]; 212 bl 218 (the far jump); 216 nop; 218 ldrb r0,[r1];
+        # 21a movs r0,#0; 21c add sp,#8; 21e pop {r4}; 220 pop {r1}; 222 bx r1.  The jump changes PC
+        # and LR only, so R1 keeps its identity and the load reads the byte just stored (F9).
+        code = body(half(0xB510, 0xB082, 0x1C04, 0x2103, 0x400C, 0x4669, 0x1909, 0x2007, 0x7008),
+                    bl(0x08000212, 0x08000218),
+                    half(0x46C0, 0x7808, 0x2000, 0xB002, 0xBC10, 0xBC02, 0x4708))
+        reach = frame_words.CalleeReach(lambda target: half(0x4770), frame_words.POLICY.swis)
+        # The core defers the indexed address and both accesses through it.
+        analysis = frame_words.FrameWordsAnalysis(code, START, {0x0800020C}, {0x08000210, 0x08000218}, {},
+                                                  spills=frozenset(), reach=reach)
+        analysis.far_jumps = {0x08000212: 0x08000218}
+        analysis.run()
+        self.assertEqual(analysis.frame_words_evidence()["identity_loads"], [0x08000218])
 
 
 # A hand-built ROM for the buffer proofs: the root at 0x08000200 and the callees each at its address.
@@ -599,6 +641,31 @@ class FarJumpNativeTests(unittest.TestCase):
         report = self.admitted(self.closure_root("k5_far_ok", K5_RELEASE + "bl 6f\n" + K5_NO_REALLOCATION))
         (line,) = self.far_lines(report, far_jump.BUFFER_LINE)
         self.assertTrue(line.startswith(f"{far_jump.BUFFER_LINE}`{far_jump.SCHEMA}` callee 0x08000500: "), line)
+
+    def test_a_callee_far_jump_leaves_no_lr_constant(self):
+        # A replayed callee (test_buffer_loop_replay's fixture, with stack arguments, so a register
+        # move carries a constant) whose arms reach the join in one state: one arm moves a
+        # constant into LR (or does a nop) and takes a far jump, which forgets R0-R3 and the flags
+        # in the replay; the other forgets R0 and the flags with lsls.  The jump writes LR, so the
+        # LR move costs no replay state; a near branch keeps the constant, and it does.
+        import test_buffer_loop_replay as loop_tests
+        callee = ("push {{r4, r5, r6, lr}}\nadds r6, r1, #0\nmovs r5, #0\nlsls r1, r5, #0\nmovs r4, #5\n"
+                  "loop:\nbl child\nstrh r0, [r6]\nadds r6, #2\ncmp r0, #0\nbeq near\n{move}{jump} join\n"
+                  "near:\nlsls r0, r0, #0\njoin:\nadds r5, #1\ncmp r5, #3\nble loop\npop {{r4, r5, r6}}\n"
+                  "pop {{r1}}\nbx r1")
+        used = {}
+        for move, jump in (("nop", "bl"), ("mov lr, r4", "bl"), ("mov lr, r4", "b")):
+            with self.subTest(move=move, jump=jump):
+                case = loop_tests.BufferLoopReplayTests("test_counted_loop_writes_exactly_the_bounded_prefix")
+                case.setUp()
+                self.addCleanup(case.doCleanups)
+                proof = case.fixture(callee.format(move=move + "\n", jump=jump), frame=8, stack_arguments=True)
+                self.assertEqual(set(proof.loop_replays), {match.ROM_BASE + 0x100})
+                self.assertEqual(case.writes(proof), {(0, 2), (2, 2), (4, 2), (6, 2)})
+                self.assertEqual(proof.far_jumps, {match.ROM_BASE + 0x100: [[0x18, 0x1E]]} if jump == "bl" else {})
+                used[move, jump] = proof.loop_replay_states
+        self.assertEqual(used["mov lr, r4", "bl"], used["nop", "bl"])
+        self.assertGreater(used["mov lr, r4", "b"], used["nop", "bl"])
 
     def test_default_routes_reach_only_classified_successor_sites(self):
         """Issue and replay each default route with a far jump in process: every successor-computing
