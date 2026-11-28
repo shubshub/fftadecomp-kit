@@ -1311,6 +1311,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "0098df8f61f0dcb36f26ccbe7ecb394df177c22fb2177305f66833293162b745",
+        "acknowledged_cursor": 7233462663,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0098df8f61f0dcb36f26ccbe7ecb394df177c22fb2177305f66833293162b745",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080F7B18\",\"who\":\"claude-ffta2\",\"note\":\"hand match, wave 18 (parked near misses on main)\"}",
+          "created_at": "2026-11-28T03:52:09Z",
+          "id": 7233462663,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-28T03:52:09Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ee62f58de29680ae52a07bbfbca13230d43c9da2a429c0e989643de96c37610d",
+        "result": {
+          "address": "0x080F7B18",
+          "claim_id": 7233462663,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 7233462663,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
