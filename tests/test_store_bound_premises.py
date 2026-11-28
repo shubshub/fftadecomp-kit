@@ -584,6 +584,27 @@ class StoreBoundTests(unittest.TestCase):
                          rf"store bound: no replayed path of 0x{self.callee:08X} \(called at 0x0800000[0-9A-F]\) "
                          rf"returns and \d+ end at a bound: the walk would verify the premise, not the call$")
 
+    def test_a_row_that_a_smaller_bound_makes_unreachable_refuses(self):
+        # The second store runs only once the first has run twice, and only on a result of 1, so some paths
+        # store it and return.  The frame allows each two; with both at 2 both rows prune.  A smaller proved
+        # bound of 1 for the first store means the second never runs: its row prunes no path, and an entry
+        # that states a premise the walk never uses is refused (without the row, the entry names other
+        # sites than the walk needs).
+        gated = "mov r0, r8\ncmp r0, #2\nblt skip2\ncmp r4, #1\nbne skip2\nsite2:\nstrh r4, [r5]\nadds r5, #2\nskip2:"
+        self.build(gated)
+        site2 = self.symbols["site2"]
+        _, proof = store_bound.walk(self.make_proof, self.run_walk, self.body, BASE, None,
+                                    self.premises([(self.callee, self.site, 2), (self.callee, site2, 2)]))
+        self.assertEqual({site for _, site, _, _ in proof.store_bound_retry["pruned"]}, {self.site, site2})
+        with self.assertRaises(ValueError) as caught:
+            store_bound.walk(self.make_proof, self.run_walk, self.body, BASE, None,
+                             self.premises([(self.callee, self.site, 1), (self.callee, site2, 2)]))
+        self.assertRegex(str(caught.exception), rf"; default store-bound retry: store bound: the row 0x{site2:08X} in "
+                                                rf"0x{self.callee:08X} prunes no path$")
+        with self.assertRaises(store_bound.StoreBoundRefusal):
+            store_bound.walk(self.make_proof, self.run_walk, self.body, BASE, None,
+                             self.premises([(self.callee, self.site, 1)]))
+
     def test_a_forced_overrun_after_an_early_return_refuses(self):
         # The call may return at once on an unknown result, so some path returns; but once the second site
         # stores it stores on all five passes, through branches the replay follows both ways (the first
