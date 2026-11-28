@@ -2404,6 +2404,12 @@ Such an owner is now admitted under its own schema,
 
 * the proof is the plain stack-argument proof, bound to an `OwnerSwitch` whose
   walk completed over the complete owner graph;
+* the owner has the shape `match.py` retries: a fixed frame and at least one
+  call, so a frameless owner (which the switch profiles prove) or one with no
+  call cannot be relabelled to this schema;
+* no call received a stack address in a dead register (`owner switch frame
+  proof excludes stack addresses passed in dead registers`): the dead-register
+  rule admits such a call uninspected, but it did receive one;
 * the owner has no `_call_via_rN` thunk call and no function literal (`owner
   switch frame proof excludes call-via thunks and function literals`), so no
   call-via register can carry the table pointer or a table word;
