@@ -39,6 +39,7 @@ FRAME_LINE = data_buffer.FRAME_FIELD + data_buffer.SUMMARIES[data_buffer.OWNER_S
 DATA_LINE = data_buffer.CALLS_FIELD + data_buffer.SUMMARIES[data_buffer.SCHEMA]
 INSPECTED = 'data-buffer evidence requires an inspected buffer call'
 THUNKS = 'owner switch frame proof excludes call-via thunks and function literals'
+DEAD = 'owner switch frame proof excludes stack addresses passed in dead registers'
 
 
 class Assembled(unittest.TestCase):
@@ -57,77 +58,103 @@ class Assembled(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
 
+    def walked(self, f, **options):
+        """(proof, verified instructions, calls) of the plain proof's owner switch walk, as prove runs it."""
+        calls, linked = self.linked(f)
+        proof = self.plain(f, **options)
+        instructions = owner_switch.walk(proof, f['data'], switch_tests.A, calls, linked)
+        return proof, instructions, calls
+
     def scalar(self):
         """Both calling cases pass a number, so the walk inspects no buffer call."""
         f = self.fixture(case0='movs r0, #1\nbl callee', case2='movs r0, #2\nbl callee')
-        calls, linked = self.linked(f)
-        proof = self.walk(f, calls=calls, linked=linked)
-        return f, proof, calls
+        return (f, *self.walked(f, dead_registers=True))
 
     def test_a_complete_owner_walk_without_a_buffer_call_is_the_frame_schema(self):
-        _, proof, calls = self.scalar()
+        _, proof, instructions, calls = self.scalar()
         self.assertFalse(proof.buffer_evidence())
         self.assertIs(proof.owner_switch.complete, True)
-        self.assertIs(data_buffer.owner_switch_frame(proof, calls, {}), True)
+        self.assertIs(data_buffer.owner_switch_frame(proof, calls, {}, instructions), True)
 
     def test_kit_main_refuses_it(self):
-        _, proof, calls = self.scalar()
+        _, proof, instructions, calls = self.scalar()
         with patch.object(data_buffer.OWNER_SWITCH_FRAME, 'enabled', False), \
                 self.assertRaisesRegex(ValueError, INSPECTED):
-            data_buffer.owner_switch_frame(proof, calls, {})
+            data_buffer.owner_switch_frame(proof, calls, {}, instructions)
 
     def test_a_buffer_call_keeps_the_plain_schema(self):
-        f = self.fixture()
-        calls, linked = self.linked(f)
-        proof = self.walk(f, calls=calls, linked=linked)
+        proof, instructions, calls = self.walked(self.fixture(), dead_registers=True)
         self.assertTrue(proof.buffer_evidence())
         with self.assertRaisesRegex(ValueError, INSPECTED):
-            data_buffer.owner_switch_frame(proof, calls, {})
+            data_buffer.owner_switch_frame(proof, calls, {}, instructions)
+
+    def test_only_the_retried_shape_takes_it(self):
+        # match.py retries only an owner with a call and a fixed frame; replay must not admit others.
+        _, proof, instructions, calls = self.scalar()
+        frameless = [item for item in instructions if not match.uses_stack_frame([item])]
+        self.assertTrue(match.uses_stack_frame(instructions))
+        self.assertFalse(match.uses_stack_frame(frameless))
+        for name, (sites, walked) in (('no call', ({}, instructions)), ('no fixed frame', (calls, frameless))):
+            with self.subTest(case=name), self.assertRaisesRegex(ValueError, INSPECTED):
+                data_buffer.owner_switch_frame(proof, sites, {}, walked)
+
+    def test_a_stack_address_in_a_dead_register_refuses(self):
+        # Inspecting the callee refuses (a SWI), and it overwrites r0 before reading it, so the call is
+        # admitted uninspected (dead_register); it still received a stack address, so the no-buffer line
+        # would be false.
+        f = self.fixture(case0='add r0, sp, #0\nbl callee', case2='movs r0, #2\nbl callee',
+                         callee='movs r0, #0\nswi 0x30\nbx lr')
+        proof, instructions, calls = self.walked(f, dead_registers=True)
+        self.assertFalse(proof.buffer_evidence())
+        self.assertTrue(proof.dead_registers.observed())
+        self.assertTrue(any(line.startswith('* buffer dead register') for line in proof.loop_replay_lines()))
+        with self.assertRaisesRegex(ValueError, DEAD):
+            data_buffer.owner_switch_frame(proof, calls, {}, instructions)
 
     def test_a_call_via_thunk_refuses(self):
-        _, proof, calls = self.scalar()
+        _, proof, instructions, calls = self.scalar()
         site = min(calls)
         for name, target in (('_call_via_r0', match.RUNTIME_HELPERS['_call_via_r0']),
                              ('_call_via_r3', match.RUNTIME_HELPERS['_call_via_r3']),
                              ('_call_via_r14', match.RUNTIME_HELPERS['_call_via_r14']),
                              ('_call_via_r3 in a wait-state mirror', match.RUNTIME_HELPERS['_call_via_r3'] + 0x02000000)):
             with self.subTest(thunk=name), self.assertRaisesRegex(ValueError, THUNKS):
-                data_buffer.owner_switch_frame(proof, {**calls, site: target}, {})
+                data_buffer.owner_switch_frame(proof, {**calls, site: target}, {}, instructions)
 
     def test_a_function_literal_refuses(self):
-        _, proof, calls = self.scalar()
+        _, proof, instructions, calls = self.scalar()
         with self.assertRaisesRegex(ValueError, THUNKS):
-            data_buffer.owner_switch_frame(proof, calls, {0x20: ('func_08010100', switch_tests.B)})
+            data_buffer.owner_switch_frame(proof, calls, {0x20: ('func_08010100', switch_tests.B)}, instructions)
 
     def test_an_unauthenticated_switch_refuses(self):
-        f, proof, calls = self.scalar()
-        unwalked = self.plain(f)
-        incomplete = self.plain(f)
+        f, proof, instructions, calls = self.scalar()
+        unwalked = self.plain(f, dead_registers=True)
+        incomplete = self.plain(f, dead_registers=True)
         incomplete.owner_switch = owner_switch.OwnerSwitch(incomplete, f['data'], switch_tests.A, *self.linked(f))
 
         class StandIn:
             complete = True
             record = proof.owner_switch.record
 
-        stand_in = self.plain(f)
+        stand_in = self.plain(f, dead_registers=True)
         stand_in.owner_switch = StandIn()
         for name, candidate in (('no owner switch', unwalked), ('walk incomplete', incomplete),
                                 ('not an OwnerSwitch', stand_in)):
             with self.subTest(case=name), self.assertRaisesRegex(ValueError, INSPECTED):
-                data_buffer.owner_switch_frame(candidate, calls, {})
+                data_buffer.owner_switch_frame(candidate, calls, {}, instructions)
 
     def test_only_the_plain_stack_argument_proof_takes_it(self):
         class Other(match.BufferCallProof):
             pass
 
-        _, proof, calls = self.scalar()
+        _, proof, instructions, calls = self.scalar()
         proof.__class__ = Other
         with self.assertRaisesRegex(ValueError, INSPECTED):
-            data_buffer.owner_switch_frame(proof, calls, {})
-        _, proof, calls = self.scalar()
+            data_buffer.owner_switch_frame(proof, calls, {}, instructions)
+        _, proof, instructions, calls = self.scalar()
         proof.stack_arguments = False
         with self.assertRaisesRegex(ValueError, INSPECTED):
-            data_buffer.owner_switch_frame(proof, calls, {})
+            data_buffer.owner_switch_frame(proof, calls, {}, instructions)
 
 
 # Five outgoing words: the fifth goes on the stack, so the owner has a fixed frame and the buffer-free
@@ -166,6 +193,33 @@ LITERAL_SWITCH = FRAME_SWITCH.replace(
     'extern void func_08000400(u32 a, u32 b, u32 c, u32 d, u32 e);\n'
     'extern void func_08000500(void);\nextern void (*data_02000010)(void);').replace(
     'case 3:\n        return 7;', 'case 3:\n        data_02000010 = func_08000500;\n        return 7;')
+# Shapes match.py never retries, which replay must not admit either (an independent review's probes):
+# four register arguments, so no fixed frame, and the plain switch walk issues it;
+FRAMELESS_SWITCH = FRAME_SWITCH.replace('u32 d, u32 e);', 'u32 d);').replace(
+    'func_08000400(1, 2, 3, 4, 5);', 'func_08000400(1, 2, 3, 4);').replace(
+    'func_08000400(phase, 2, 3, 4, data_02000000[2]);', 'func_08000400(phase, 2, 3, data_02000000[2]);')
+# a fixed frame from an incoming stack argument, and no call at all.
+NO_CALL_SWITCH = data_calls.HEADER + """u32 func_08000200(u32 phase, u32 a, u32 b, u32 c, u32 e)
+{
+    switch (phase) {
+    case 0:
+        data_02000000[0] = e;
+        return 1;
+    case 1:
+        data_02000000[1] = a;
+        return 1;
+    case 2:
+        data_02000000[2] = b + e;
+        return 3;
+    case 3:
+        return 7;
+    case 4:
+        data_02000000[1] = c;
+        return 2;
+    }
+    return 0;
+}
+"""
 OBJECTS = dict(data_calls.OBJECTS, data_02000010='0x02000010')
 
 
@@ -196,7 +250,9 @@ class Native(unittest.TestCase):
                 ('frame', FRAME_SWITCH, [('func_08000400', 'bx lr')], False),
                 ('buffer', switch_tests.DATA_SWITCH, [('func_08000400', data_calls.STORES)], False),
                 ('thunk', THUNK_SWITCH, [('func_08000400', 'bx lr')], True),
-                ('literal', LITERAL_SWITCH, [('func_08000400', 'bx lr'), ('func_08000500', 'bx lr')], False)):
+                ('literal', LITERAL_SWITCH, [('func_08000400', 'bx lr'), ('func_08000500', 'bx lr')], False),
+                ('frameless', FRAMELESS_SWITCH, [('func_08000400', 'bx lr')], False),
+                ('no call', NO_CALL_SWITCH, [('func_08000400', 'bx lr')], False)):
             try:
                 root = build_owner(Path(cls.temporary.name) / name, source, callees, large)
             except ValueError as error:
@@ -213,6 +269,63 @@ class Native(unittest.TestCase):
         root = self.runs[name][0]
         with patch.dict(os.environ, FFTA_ROM=str(root / 'baserom.bin')):
             return evidence.report_matches(report, root, data_calls.A)
+
+    def forced(self, name, patches):
+        """match.main() in process with `patches` applied: (exit code or message, report or None)."""
+        root = self.runs[name][0]
+        path = root / 'docs/match/08000200.md'
+        saved = path.read_text() if path.exists() else None
+        with contextlib.ExitStack() as stack:
+            for target, attribute, value in patches:
+                stack.enter_context(patch.object(target, attribute, value))
+            stack.enter_context(patch.dict(os.environ, FFTA_ROM=str(root / 'baserom.bin')))
+            stack.enter_context(patch.object(sys, 'argv', ['match.py', '--root', str(root), '0x08000200']))
+            stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
+            if path.exists():
+                path.unlink()
+            try:
+                match.main()
+                code = 0
+            except SystemExit as stop:
+                code = stop.code
+        report = path.read_text() if path.exists() else None
+        if saved is None:
+            path.unlink(missing_ok=True)
+        else:
+            path.write_text(saved)
+        return code, report
+
+    def check_never_retried(self, name, route):
+        """Forced through the owner-switch retry the shape refuses; a report forged by admitting it anyway
+        (the rule's check stubbed out) does not replay, with either control-flow line."""
+        code, report = self.forced(name, [route])
+        self.assertIsNone(report)
+        self.assertIn('owner-switch data-buffer proof: ' + INSPECTED, str(code))
+        code, forged = self.forced(name, [route, (data_buffer, 'owner_switch_frame', lambda *args: True)])
+        self.assertEqual(code, 0)
+        self.assertEqual(data_calls.verification(forged), data_buffer.OWNER_SWITCH_FRAME_SCHEMA)
+        flow = '* control flow: ' + evidence.CALL_SUMMARY
+        for text in (forged, forged.replace('* control flow: closed leaf CFG', flow)):
+            with self.subTest(name=name, control_flow=flow in text):
+                self.assertFalse(self.replays(name, text))
+
+    def test_a_frameless_owner_keeps_its_switch_schema_and_never_takes_this_one(self):
+        _, code, output, report = self.runs['frameless']
+        self.assertEqual(code, 0, output)
+        self.assertNotEqual(data_calls.verification(report), data_buffer.OWNER_SWITCH_FRAME_SCHEMA)
+        self.assertTrue(self.replays('frameless', report))
+
+        def refuse(*args, **kwargs):
+            raise ValueError('switch walk refused for the test')
+        self.check_never_retried('frameless', (match, 'verify_switches', refuse))
+
+    def test_a_framed_owner_without_a_call_never_takes_this_schema(self):
+        _, code, output, report = self.runs['no call']
+        self.assertNotEqual(code, 0)
+        self.assertIsNone(report)
+        self.assertIn('switch evidence excludes fixed frames and runtime call thunks', output)
+        self.assertNotIn('owner-switch data-buffer proof', output)
+        self.check_never_retried('no call', (owner_switch, 'retries', lambda *args, **kwargs: True))
 
     def test_the_frame_owner_matches_states_no_buffer_call_and_replays(self):
         _, code, output, report = self.runs['frame']

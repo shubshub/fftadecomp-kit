@@ -16,10 +16,12 @@ Schemas for matcher paths that reach a buffer call with named data:
   buffer.  The walk is the one the plain schema runs (fixed frame, every
   SP-derived value tracked, calls under their ABI summaries, returns re-proved);
   only that schema's demand for an inspected buffer call is not made, and the
-  report says so in its buffer-calls line.  An owner with a ``_call_via_rN``
-  thunk call or a function literal refuses, and one with a summarised division
-  runtime call keeps the plain refusal (``OWNER_SWITCH_FRAME.enabled = False``
-  restores it for every owner).
+  report says so in its buffer-calls line.  Only the shape match.py retries
+  qualifies: a fixed frame and at least one call.  An owner with a stack address
+  in a dead register at a call, a ``_call_via_rN`` thunk call or a function
+  literal refuses, and one with a summarised division runtime call keeps the
+  plain refusal (``OWNER_SWITCH_FRAME.enabled = False`` restores it for every
+  owner).
 
 Both require typed provenance for every reached RAM or ROM address-domain
 literal word, as the complete-owner selectors do; untyped words in the fixed
@@ -89,12 +91,14 @@ def calls_field(schema):
     return FRAME_FIELD if schema == OWNER_SWITCH_FRAME_SCHEMA else CALLS_FIELD
 
 
-def owner_switch_frame(proof, calls, function_relocations):
+def owner_switch_frame(proof, calls, function_relocations, instructions):
     """Whether a walk that inspected no buffer call is the owner switch frame schema's; refuses otherwise.
 
     The plain path's proof, bound to an owner switch whose walk completed (owner_switch_buffer_profile
-    authenticated the table from the ROM bytes and the walk covered the complete owner graph), with no
-    `_call_via_rN` thunk call, no function literal and no summarised division runtime call.
+    authenticated the table from the ROM bytes and the walk covered the complete owner graph), over an
+    owner with a fixed frame and at least one call (the shape match.py retries), with no stack address in a
+    dead register at a call, no `_call_via_rN` thunk call, no function literal and no summarised division
+    runtime call.
     """
     import match
     import function_thunk_profile as thunk
@@ -102,8 +106,12 @@ def owner_switch_frame(proof, calls, function_relocations):
     owner = getattr(proof, "owner_switch", None)
     # prove() builds the proof from this module's `match`, as OwnerSwitch requires.
     if not OWNER_SWITCH_FRAME.enabled or proof.buffer_evidence() or type(owner) is not OwnerSwitch or \
-            owner.complete is not True or type(proof) is not match.BufferCallProof or proof.stack_arguments is not True:
+            owner.complete is not True or type(proof) is not match.BufferCallProof or proof.stack_arguments is not True or \
+            not calls or not match.uses_stack_frame(instructions):
         raise ValueError("data-buffer evidence requires an inspected buffer call")
+    if proof.dead_registers is not None and proof.dead_registers.observed():
+        # A call admitted because its callee overwrites a stack address in R0-R3 still received one.
+        raise ValueError("owner switch frame proof excludes stack addresses passed in dead registers")
     if match.remainder_leaf.active() and any(target in match.remainder_leaf.entries() for target in calls.values()):
         # A summarised division runtime site counts as the inspected call only under that leaf's own
         # evidence rule (signed_remainder_leaf_profile); this schema never stands in for it.
@@ -306,7 +314,7 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
                 instructions, proof = closure.retry(error, run, rebuild, data, address, premises, reset=reset)
     if not proof.buffer_evidence():
         # Only the plain proof's owner switch walk, with no thunk or function literal, goes on without one.
-        owner_switch_frame(proof, calls, function_relocations)
+        owner_switch_frame(proof, calls, function_relocations, instructions)
         schema = OWNER_SWITCH_FRAME_SCHEMA
     match.verify_data_literals(instructions, address, literals)
     thunk.verify_literal_bindings(data, address, instructions, calls, mapping, function_relocations)
