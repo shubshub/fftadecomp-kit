@@ -970,8 +970,11 @@ line must equal the ROM every replay reads. Every schema replay sees exactly the
 `issued_report_pins` runs only after `--check-report` has found the whole saved text, line included,
 identical to the one `match.py` writes now, so it reads the report without the line. The line is bound by recomputation and whole-text
 comparison, as the callee-saved premise lines are; it is in no proof digest. A rule that keeps a fact
-across stores the walk cannot place calls `standing_premise.require` and names
-`untracked-pointer-frame-v1` in its own fingerprinted evidence.
+across stores the walk cannot place calls `standing_premise.require(data, root, address)` and names
+`untracked-pointer-frame-v1` in its own fingerprinted evidence. `require` accepts only where the report
+prints the line: the bytes must be the ROM's whole indexed span at the address, the mode is the mapping's,
+and the walk reaches an SP write, or an instruction it cannot follow, inside those bytes (running off
+their end proves nothing).
 
 ### Callee-saved registers holding stack addresses (kit #350)
 

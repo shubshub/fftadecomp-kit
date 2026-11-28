@@ -87,11 +87,18 @@ def _engine(thumb):
     return engine
 
 
-def holds_frame(data, address, thumb):
-    """Whether code reachable from the entry of `data` (at `address`) writes SP, or cannot be followed."""
+def holds_frame(data, address, thumb, strict=False):
+    """Whether code reachable from the entry of `data` (at `address`) writes SP, or cannot be followed.
+
+    `strict` (for require) drops the one conservative answer that a shorter `data` can give where the
+    function's whole body would not: control running off the end of `data`, or an instruction cut
+    short there, then proves nothing, and only an SP write or another unfollowable instruction inside
+    `data` answers True."""
     data = bytes(data)
     end = address + len(data)
-    if not data or address % (2 if thumb else 4):
+    if not data:
+        return not strict
+    if address % (2 if thumb else 4):
         return True
     engine = _engine(thumb)
     seen = set()
@@ -102,6 +109,8 @@ def holds_frame(data, address, thumb):
         if pc in seen:
             continue
         if not address <= pc < end:
+            if strict:
+                continue
             return True                      # control runs off the span
         seen.add(pc)
         steps += 1
@@ -109,6 +118,8 @@ def holds_frame(data, address, thumb):
             return True
         offset = pc - address
         decoded = list(engine.disasm(data[offset:offset + 4], pc, 1))
+        if strict and (decoded and pc + decoded[0].size > end or not decoded and offset + 4 > len(data)):
+            continue                         # cut short by the end of `data`: no answer here
         if not decoded or pc + decoded[0].size > end:
             return True                      # an undecodable halfword, or an instruction past the span
         instruction = decoded[0]
@@ -184,9 +195,16 @@ def _function_bytes(lines, root, address):
     if found is None:
         raise ValueError("frame premise: report has no single canonical ROM bytes line")
     data = bytes.fromhex(found[1])
-    if len(data) != int(found[2]) or address < ROM_BASE:
+    if len(data) != int(found[2]):
         raise ValueError("frame premise: report ROM bytes line is inconsistent")
-    import match_evidence          # the ROM every replay reads, as the replays read it
+    return _in_rom(data, root, address)
+
+
+def _in_rom(data, root, address):
+    """`data`, required to equal the ROM every replay reads (as the replays read it) at `address`."""
+    if address < ROM_BASE:
+        raise ValueError("frame premise: address below the ROM")
+    import match_evidence
     rom = Path(match_evidence.report_rom_path(root)).read_bytes()
     if rom[address - ROM_BASE:address - ROM_BASE + len(data)] != data:
         raise ValueError("frame premise: report ROM bytes differ from the ROM")
@@ -236,7 +254,41 @@ def without(report):
     return "\n".join(line for line in report.split("\n") if line != LINE)
 
 
-def require(data, address, thumb):
-    """Raise unless the premise applies to `data` at `address`, for a rule that relies on it."""
-    if not holds_frame(data, address, thumb):
+def _indexed_span(root, address):
+    """The length symbols/functions.txt gives the function at `address` (its one row), else None:
+    the span match.py starts from, and no report covers less."""
+    try:
+        rows = (Path(root) / "symbols" / "functions.txt").read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeError):
+        return None
+    spans = []
+    for row in rows:
+        fields = row.split()
+        if not fields or row.startswith("#"):
+            continue
+        try:
+            if int(fields[0], 16) == address:
+                spans.append(int(fields[1], 16) - address)
+        except (IndexError, ValueError):
+            return None
+    return spans[0] if len(spans) == 1 and spans[0] > 0 else None
+
+
+def require(data, root, address):
+    """Raise unless the report for `data` at `address` under `root` states the premise, for a rule
+    that relies on it.
+
+    A rule never passes its own idea of the function: `data` must be the ROM's bytes at `address`,
+    the mode is the mapping's (an unknown mode prints the line whatever the bytes), and `data` must be
+    the whole indexed span, so that neither a prefix (which can run off its own end) nor bytes past the
+    function (which a branch out of it can reach) decide.  The walk is strict, so it accepts only on
+    an SP write or an unfollowable instruction inside `data`; a report never covers less than the
+    indexed span, so the line is then printed."""
+    data = _in_rom(bytes(data), root, address)
+    mode = _mode(root, address)
+    if mode is None:
+        return
+    if len(data) != _indexed_span(root, address):
+        raise ValueError(f"rule relies on `{POLICY}` for bytes that are not the function's indexed span")
+    if not holds_frame(data, address, mode == "thumb", strict=True):
         raise ValueError(f"rule relies on `{POLICY}`, which a frameless function's report does not state")
