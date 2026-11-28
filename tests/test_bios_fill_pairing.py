@@ -71,7 +71,9 @@ class PairingTests(unittest.TestCase):
                 ("a frame copy's source no frame slot", [LOST, KEPT, dict(REAL[2], slot=None, addressed=True),
                                                          REAL[3]], "BIOS call 3 has no frame slot as its source"),
                 ("a frame slot where R has none", [LOST, KEPT, REAL[2], dict(REAL[3], slot=(18, -8))],
-                 "BIOS call 4 has a frame slot as its source")):
+                 "BIOS call 4 has a frame slot as its source"),
+                ("another control on a call that is no fill", [LOST, KEPT, dict(REAL[2], control=0x04000020),
+                                                               REAL[3]], "BIOS call 3 has another control")):
             with self.subTest(label=label), self.assertRaisesRegex(proof.ProofError, reason):
                 removal(calls)
 

@@ -34,7 +34,8 @@ LDR_R1, LDR_R2 = base.LDR_R1, base.LDR_R2
 MOV_R6_SP, ADDS_R6_2, ADDS_R6_4 = 0x466E, 0x3602, 0x3604
 MOVS_R5_0, STRH_R5_R6, ADDS_R0_R6 = 0x2500, 0x8035, 0x1C30
 SUB_SP_8, SWI_0B = 0xB082, 0xDF0B
-CALLEE = 0x08001000
+STRH_R5_R0, LDMIA_R0_R6, PUSH_R7, POP_R7 = 0x8005, 0xC840, 0xB480, 0xBC80
+CALLEE, CALLEE2 = 0x08001000, 0x08001100
 CPUSET = ("bl", 0x0814186C)
 
 
@@ -98,6 +99,10 @@ class RouteTests(unittest.TestCase):
                 ("an sp write on a route", [MOV_R6_SP, ADDS_R6_2, SUB_SP_8, ("bl", CALLEE)] + path(), (),
                  "changes sp on a route"),
                 ("a SWI on a route", [MOV_R6_SP, ADDS_R6_2, SWI_0B, ("bl", CALLEE)] + path(), (), "is a SWI"),
+                ("a block load writing it on a route", [MOV_R6_SP, ADDS_R6_2, LDMIA_R0_R6, ("bl", CALLEE)] + path(),
+                 (), "writes r6 with no stack address"),
+                ("a push and pop on a route", [MOV_R6_SP, ADDS_R6_2, PUSH_R7, POP_R7, ("bl", CALLEE)] + path(), (),
+                 "changes sp on a route"),
                 ("the entry without a forming site", path(), (), "reaches the function's entry"),
                 ("a loop back to the entry", [("bl", CALLEE), ("beq", 0)] + path(), {0},
                  "reaches the function's entry"),
@@ -145,13 +150,17 @@ class RouteTests(unittest.TestCase):
 class CarrierTests(unittest.TestCase):
     """the real callee-saved check (callee_saved_watch.Checker) on a callee the ROM holds"""
 
-    def carrier(self, callee):
-        rom, compiled, one = case(SHAPE)
+    def carrier(self, callee, items=SHAPE):
+        """(rom, compiled, fill, Carrier) of items with each callee in the ROM and the index: callee is the
+        halfwords at CALLEE, or {address: halfwords}"""
+        callees = callee if isinstance(callee, dict) else {CALLEE: callee}
+        rom, compiled, one = case(items)
         rom = bytearray(rom)
-        rom[CALLEE - fill.BASE:CALLEE - fill.BASE + 2 * len(callee)] = thumb(*callee)
         code = compiled["text"][0]
-        entries = [{"rom": f"0x{ADDRESS:08X}", "end": f"0x{ADDRESS + len(code):08X}", "mode": "thumb"},
-                   {"rom": f"0x{CALLEE:08X}", "end": f"0x{CALLEE + 2 * len(callee):08X}", "mode": "thumb"}]
+        entries = [{"rom": f"0x{ADDRESS:08X}", "end": f"0x{ADDRESS + len(code):08X}", "mode": "thumb"}]
+        for at, halves in sorted(callees.items()):
+            rom[at - fill.BASE:at - fill.BASE + 2 * len(halves)] = thumb(*halves)
+            entries.append({"rom": f"0x{at:08X}", "end": f"0x{at + 2 * len(halves):08X}", "mode": "thumb"})
         return bytes(rom), compiled, one, fill.Carrier(bytes(rom), entries, ADDRESS)
 
     def test_a_callee_that_keeps_the_register_is_admitted(self):
@@ -167,6 +176,22 @@ class CarrierTests(unittest.TestCase):
                 with self.assertRaisesRegex(proof.ProofError, "r0 holds no stack address .*the callee-saved check "
                                                               f"refuses the call at {ADDRESS + 4:08X}"):
                     fill.rom_fill(rom, ADDRESS, compiled, one, carrier=carrier)
+
+    def test_every_crossed_call_is_walked(self):
+        # two calls between the forming and the line: the first overwrites r6, the second keeps it
+        items = [MOV_R6_SP, ADDS_R6_2, ("bl", CALLEE), ("bl", CALLEE2)] + path()
+        rom, compiled, one, carrier = self.carrier({CALLEE: [0x2600, 0x4770], CALLEE2: [0x4770]}, items)
+        with self.assertRaisesRegex(proof.ProofError, "r0 holds no stack address .*the callee-saved check refuses "
+                                                      f"the call at {ADDRESS + 4:08X}"):
+            fill.rom_fill(rom, ADDRESS, compiled, one, carrier=carrier)
+
+    def test_a_callee_handing_the_address_back_is_followed_into_the_caller(self):
+        # adds r0, r6, #0; bx lr: the caller then stores through r0, a store to the slot the fill's line does not
+        # show; the check's walk of the caller after the call (its continuation) is what sees it
+        items = [MOV_R6_SP, ADDS_R6_2, ("bl", CALLEE), MOVS_R5_0, STRH_R5_R0] + path()[1:]
+        rom, compiled, one, carrier = self.carrier([ADDS_R0_R6, 0x4770], items)
+        with self.assertRaisesRegex(proof.ProofError, "r0 holds no stack address .*the callee-saved check refuses"):
+            fill.rom_fill(rom, ADDRESS, compiled, one, carrier=carrier)
 
 
 # Compiled shapes (agbcc), each one fill: the slot's address hoisted out of a loop of calls into
