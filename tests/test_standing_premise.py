@@ -143,10 +143,70 @@ class HoldsFrameTests(unittest.TestCase):
         self.assertTrue(standing.holds_frame(arm(0xE1A0F000, 0xE12FFF1E), BASE, False))   # mov pc, r0; bx lr
         self.assertTrue(standing.holds_frame(FRAMELESS, BASE + 2, False))     # misaligned
 
-    def test_require(self):
-        standing.require(FRAMED, BASE, True)
-        with self.assertRaisesRegex(ValueError, standing.POLICY):
-            standing.require(FRAMELESS, BASE, True)
+    def test_the_strict_walk_drops_only_the_end_of_the_bytes(self):
+        for name, data, normal, strict in (
+                ("no bytes", b"", True, False),
+                ("runs off the end", thumb(0x3001), True, False),
+                ("an instruction cut short at the end", thumb(0x3001, 0xF000), True, False),
+                ("a frame", FRAMED, True, True),
+                ("a frameless leaf", FRAMELESS, False, False),
+                ("an undecodable halfword inside the bytes", thumb(0xE800, BX_LR), True, True),
+                ("a computed PC write", thumb(0x4687, BX_LR), True, True)):
+            with self.subTest(name):
+                self.assertEqual(standing.holds_frame(data, BASE, True), normal)
+                self.assertEqual(standing.holds_frame(data, BASE, True, strict=True), strict)
+        self.assertTrue(standing.holds_frame(FRAMELESS, BASE + 1, True, strict=True))     # misaligned
+
+    def test_require_relies_only_where_the_line_is_printed(self):
+        # 0xE3A0B500, 0xE12FFF1E: mov fp, #0; bx lr in ARM (no frame); its first halfword is a Thumb push.
+        either = arm(0xE3A0B500, 0xE12FFF1E)
+        self.assertTrue(standing.holds_frame(either, BASE, True))
+        self.assertFalse(standing.holds_frame(either, BASE, False))
+        framed_at, leaf_at, arm_at, unmapped_at = BASE, BASE + 0x100, BASE + 0x200, BASE + 0x300
+        tail_at, next_at, off_at, unindexed_at = BASE + 0x500, BASE + 0x504, BASE + 0x600, BASE + 0x700
+        cut_at, twice_at = BASE + 0x800, BASE + 0x900
+        cut = thumb(0x3001, 0xF000)                # adds r0, #1; the first half of a BL, cut by its end
+        tail = thumb(0xE000)                       # b +4: to the next function, outside its own span
+        off_end = thumb(0x3001, *bl(off_at + 2, CALLEE))    # adds r0, #1; bl out: falls off its end
+        fixture = FixtureRoot(self, {framed_at: FRAMED, leaf_at: FRAMELESS, arm_at: either, unmapped_at: either,
+                                     tail_at: tail, next_at: FRAMED, off_at: off_end, unindexed_at: FRAMED,
+                                     cut_at: cut, twice_at: FRAMED},
+                              modes={arm_at: "arm"})
+        root = fixture.path
+        rows = json.loads((root / "config/functions.json").read_text())
+        fixture.write_mapping([row for row in rows if int(row["rom"], 16) != unmapped_at])
+        spans = {int(row["rom"], 16): int(row["end"], 16) - int(row["rom"], 16) for row in rows}
+        del spans[unindexed_at]
+        fixture.write_index(spans)
+        index = root / "symbols/functions.txt"             # a second row for twice_at: no single span
+        index.write_text(index.read_text() + f"{twice_at:08X} {twice_at + 8:08X} 8 1 return\n")
+        overlong = (root / "baserom.bin").read_bytes()[tail_at - BASE:next_at - BASE + len(FRAMED)]
+        self.assertTrue(standing.holds_frame(overlong, tail_at, True, strict=True))   # reaches next's push
+        accepted = [("framed", FRAMED, framed_at),
+                    ("no unique mode: the line is printed whatever the bytes", either, unmapped_at),
+                    ("no unique mode, a prefix", either[:2], unmapped_at)]
+        refused = [("frameless", FRAMELESS, leaf_at),
+                   ("a prefix of a frameless function, which runs off its own end", FRAMELESS[:2], leaf_at),
+                   ("a prefix of a framed function", FRAMED[:2], framed_at),
+                   ("bytes past the function, reached by its branch out", overlong, tail_at),
+                   ("the whole of that frameless function", tail, tail_at),
+                   ("mapped ARM, framed only as Thumb", either, arm_at),
+                   ("framed only by running off its end (printed, but not proved)", off_end, off_at),
+                   ("framed only by an instruction cut short at its end", cut, cut_at),
+                   ("mapped but not indexed", FRAMED, unindexed_at),
+                   ("indexed twice", FRAMED, twice_at),
+                   ("not the ROM's bytes", FRAMED, leaf_at),
+                   ("below the ROM", FRAMED, BASE - 4)]
+        for name, data, address in accepted:
+            with self.subTest(name):
+                standing.require(data, root, address)
+        for name, data, address in refused:
+            with self.subTest(name), self.assertRaises(ValueError):
+                standing.require(data, root, address)
+        # it relies on the premise only where the function's report prints the line
+        for name, data, address in accepted:
+            with self.subTest(printed=name):
+                self.assertIn(standing.LINE, standing.carry(report_text(data, address), root, address))
 
 
 def report_text(body, address=BASE, schema="elf-symbol-thumb-calls-v1"):
@@ -164,6 +224,7 @@ class FixtureRoot:
     def __init__(self, test, functions, modes=None):
         self.path = scratch_root(test, "standing_premise_")
         (self.path / "config").mkdir()
+        (self.path / "symbols").mkdir()
         rom = bytearray(ROM_SIZE)
         for address, body in functions.items():
             rom[address - BASE:address - BASE + len(body)] = body
@@ -171,10 +232,16 @@ class FixtureRoot:
         modes = modes or {}
         self.write_mapping([{"rom": f"0x{address:08X}", "end": f"0x{address + len(body):08X}",
                              "mode": modes.get(address, "thumb")} for address, body in functions.items()])
+        self.write_index({address: len(body) for address, body in functions.items()})
         test.enterContext(mock.patch.dict(os.environ, {"FFTA_ROM": str(self.path / "baserom.bin")}))
 
     def write_mapping(self, rows):
         (self.path / "config/functions.json").write_text(json.dumps(rows))
+
+    def write_index(self, spans):
+        """symbols/functions.txt rows (address end size), as the index lists them."""
+        (self.path / "symbols/functions.txt").write_text("".join(
+            f"{address:08X} {address + size:08X} {size} 1 return\n" for address, size in sorted(spans.items())))
 
 
 class CarryStripTests(unittest.TestCase):
@@ -234,6 +301,7 @@ class CarryStripTests(unittest.TestCase):
                 ("another marker beside it", carried.replace(
                     "* compiler:", "- frame premise: proved\n* compiler:", 1)),
                 ("ROM bytes differ", carried.replace(FRAMED.hex(), "01b5" + FRAMED.hex()[4:], 1)),
+                ("ROM bytes count differs", carried.replace(f"({len(FRAMED)} bytes)", f"({len(FRAMED) + 2} bytes)", 1)),
                 ("two ROM bytes lines", carried.replace("* compiled :", f"* ROM bytes: `{FRAMED.hex()}` "
                                                         f"({len(FRAMED)} bytes)\n* compiled :", 1)),
                 ("no ROM bytes line", "\n".join(line for line in lines if not line.startswith("* ROM bytes"))),
