@@ -282,6 +282,38 @@ class FreshBlockTests(unittest.TestCase):
                 self.build(between=BETWEEN + f"\nadds r1, r7, #0\nmovs r2, #4\nstr r0, [{base}, r2]", creator=creator)
                 self.refused("may overwrite the stored word", self.entry(offset=4))
 
+    def test_the_rows_store_and_reload_are_plain_word_accesses_of_the_base(self):
+        # A register-indexed row store or reload reaches base + index, not the row's word; a halfword or
+        # byte row store writes part of the word, and a halfword reload reads part of it.
+        indexed = "    movs r1, #4\n"
+        for old, new in (("store:\n    str r4, [r7]\n", indexed + "store:\n    str r4, [r7, r1]\n"),
+                         ("reload:\n    ldr r3, [r7]\n", indexed + "reload:\n    ldr r3, [r7, r1]\n"),
+                         ("store:\n    str r4, [r7]\n", "store:\n    strh r4, [r7]\n"),
+                         ("store:\n    str r4, [r7]\n", "store:\n    strb r4, [r7]\n"),
+                         ("reload:\n    ldr r3, [r7]\n", "reload:\n    ldrh r3, [r7]\n")):
+            with self.subTest(row=new.strip()):
+                creator = CREATOR.replace(old, new)
+                self.assertNotEqual(creator, CREATOR)
+                self.build(creator=creator)
+                self.refused("not word accesses of the base", self.entry())
+
+    def test_a_stored_fact_serves_one_reload(self):
+        # Two rows share the store and reload the word one after the other.  The first reload takes the
+        # stored fact, so the second (the call's) finds none and the call refuses as it does without an
+        # entry; the call's row alone is admitted.
+        creator = CREATOR.replace("reload:\n    ldr r3, [r7]\n", "reload:\n    ldr r1, [r7]\n    ldr r3, [r7]\n")
+        self.build(creator=creator)
+        second = f"0x{self.symbols['reload'] + 2:08X}"
+        proof = self.prove(self.entry(reload=second))
+        self.assertEqual(proof.fresh_block_uses,
+                         {(self.symbols["creator"], self.symbols["store"], self.symbols["reload"] + 2)})
+        entries = self.entry()
+        (row,) = entries[f"0x{self.symbols['creator']:08X}"]["rows"]
+        entries[f"0x{self.symbols['creator']:08X}"]["rows"].append(dict(row, reload=second))
+        with self.assertRaises(ValueError) as caught:
+            self.prove(entries)
+        self.assertNotIn("fresh block", str(caught.exception))
+
     def test_a_store_through_a_copy_of_the_base_is_checked(self):
         # Exact copies of the base and immediate adds of them are followed (rv-137's S2 shape first).
         copy = BETWEEN + "\nadds r1, r7, #0\n"

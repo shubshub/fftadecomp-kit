@@ -268,6 +268,22 @@ class IwramImageTests(unittest.TestCase):
                 rom[offset:offset + len(patch_bytes)] = patch_bytes
                 with self.assertRaises(ValueError):
                     iwram.derive(bytes(rom), self.entries)
+        # Each straight run, and BOOT's paths, are checked instruction by instruction: a branch inside
+        # MAIN's run (after its leaf call) or the copier's, a return on the fallthrough of BOOT's bne,
+        # and a conditional instruction in the ARM reset code each refuse.
+        reset = struct.unpack_from("<I", self.rom, 0xC0)[0]
+        self.assertEqual(reset >> 28, 0xE)
+        for name, (offset, patch_bytes, pattern) in {
+                "a branch in MAIN's run": (0x25A, struct.pack("<H", 0xE000), "does not run straight"),
+                "a branch in the copier's run": (0x276A, struct.pack("<H", 0xE000), "does not run straight"),
+                "a return on BOOT's fallthrough": (0x271A, struct.pack("<H", 0x4770), "before the copier"),
+                "a conditional reset instruction": (0xC0, struct.pack("<I", reset & 0x0FFFFFFF | 0x10000000),
+                                                    "reset code does not run straight")}.items():
+            with self.subTest(name=name):
+                rom = bytearray(self.rom)
+                rom[offset:offset + len(patch_bytes)] = patch_bytes
+                with self.assertRaisesRegex(ValueError, pattern):
+                    iwram.derive(bytes(rom), self.entries)
         with self.assertRaisesRegex(ValueError, "exact indexed CpuSet wrapper"):
             iwram.derive(bytes(self.rom), self.entries[:4])
 

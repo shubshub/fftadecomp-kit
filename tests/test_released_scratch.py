@@ -189,6 +189,16 @@ class ReleasedScratchTests(unittest.TestCase):
         body = X.replace("mov r2, sp", "add r2, sp, #12")
         self.refused(f"{released.ESCAPE}|outside allocated local words", owner("movs r2, #0"), func_X=body)
 
+    def test_a_callee_returning_its_entry_sp_keeps_the_refusal(self):
+        # X hands back r2 = its entry SP (the owner's SP at the call): the owner's live frame, not X's
+        # released one, so the return refuses although the owner overwrites r2.  Entry SP + 4 already
+        # refuses at the add, which leaves X's tracked frame.
+        for add, pattern in (("#12", released.ESCAPE), ("#16", "stack alias arithmetic leaves the tracked frame")):
+            with self.subTest(add=add):
+                body = ("push {lr}\nsub sp, #8\nmovs r1, #1\nstrh r1, [r0]\n"
+                        f"add r2, sp, {add}\nadd sp, #8\npop {{r0}}\nbx r0")
+                self.refused(pattern, owner("movs r2, #0"), func_X=body)
+
     def test_a_release_on_one_path_is_released_after_the_join(self):
         # X releases r2 only when r1 is nonzero; the owner reads r2 after the join
         body = ("push {lr}\nsub sp, #8\nmovs r2, #0\ncmp r1, #0\nbeq 1f\nmov r2, sp\n1:\nmovs r0, #0\n"
