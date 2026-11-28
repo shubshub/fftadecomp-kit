@@ -86,6 +86,15 @@ class InertControlFlowJustificationTests(unittest.TestCase):
                 text = source(comment=comment)
                 self.assertEqual(inert(text), [(line_of(text, "if ("), "suspect")])
 
+    def test_an_address_run_into_a_longer_number_or_a_word_does_not_count(self):
+        # a ROM address is a whole number of eight digits: one that runs on into more digits or a word cites nothing
+        for comment in ("    /* plausible: the ROM keeps the test's dead load at 0x081486340 */\n",
+                        "    /* plausible: the ROM keeps the test's dead load at id0x08148634 */\n",
+                        "    /* plausible: the ROM keeps the test's dead load at 0x08148634_load */\n"):
+            with self.subTest(comment=comment):
+                text = source(comment=comment)
+                self.assertEqual(inert(text), [(line_of(text, "if ("), "suspect")])
+
     def test_a_justification_on_another_line_does_not_count(self):
         for text in (
                 # two lines above
