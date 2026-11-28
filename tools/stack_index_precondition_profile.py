@@ -948,6 +948,7 @@ class Analysis:
                     # A far jump the core walked: PC := target, LR := its continuation; nothing else changes.
                     state.regs[14] = TOP
                     state.exprs[14] = None
+                    state.same = apart(state.same, (14,))     # LR no longer holds a copy of anything
                     return [(target, state)]
                 refuse("same-owner long branches are outside this policy")
             # R12 is call-clobbered, so the analysis cannot know its value after the call,
