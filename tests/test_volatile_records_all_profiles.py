@@ -159,7 +159,7 @@ class AddressedRuntimeRecordTests(unittest.TestCase):
             self.assertFalse(match_evidence.report_matches(report.replace("agrees on", "agrees  on"), root, A))
             self.assertFalse(match_evidence.report_matches(
                 report.replace(SEMANTICS, SEMANTICS + "\n" + SEMANTICS), root, A))
-            self.assertFalse(match_evidence.report_matches(addressed.render(result), root, A))
+            self.assertFalse(report_fixtures.replay(addressed.render(result), root, A))
         with patch.object(match, "allowlisted_volatile_semantics",
                           side_effect=volatile_semantics.SemanticError("dead load")):
             self.assertFalse(match_evidence.report_matches(report, root, A))

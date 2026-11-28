@@ -258,7 +258,7 @@ class UnsignedRemainderTests(unittest.TestCase):
             return self.rom if path.resolve() == self.rom_path else original_read(path)
         with patch.object(Path, "read_bytes", read):
             instructions = profile.verify(self.body, BASE, self.rom, self.mapping, self.objects, manifest)
-            self.assertFalse(evidence.report_matches("\n".join(lines), self.root, BASE))
+            self.assertFalse(report_fixtures.replay("\n".join(lines), self.root, BASE))
             report = report_fixtures.complete(
                 self.root, BASE, self.body, profile.SCHEMA, instructions, mapping=self.mapping,
                 data_mapping=self.objects, mapped=True, control_flow=evidence.CALL_SUMMARY,
@@ -270,7 +270,7 @@ class UnsignedRemainderTests(unittest.TestCase):
                             report.replace("* stack frame:", "* extra stack frame:"),
                             report + "\n* signed remainder: forged"):
                 with self.subTest(changed=changed[-100:]):
-                    self.assertFalse(evidence.report_matches(changed, self.root, BASE))
+                    self.assertFalse(report_fixtures.replay(changed, self.root, BASE))
             source = self.root / "src/08000000.c"
             original_digest = evidence.source_fingerprint(self.root, BASE)
             source.write_text(source.read_text().replace("60U", "61U"))

@@ -335,13 +335,13 @@ class DoubleSelectedRecordTests(unittest.TestCase):
                 path = root/name; original = path.read_bytes(); path.write_bytes(original+b' ')
                 try:
                     with self.subTest(path=name), patch.object(admission, 'build', side_effect=AssertionError('stale cannot rebuild')):
-                        self.assertFalse(old.evidence.report_matches(report, root, A))
+                        self.assertFalse(report_fixtures.replay(report, root, A))
                 finally:
                     path.write_bytes(original)
             for name in ('runtime_fingerprint', 'producer_fingerprint'):
                 with self.subTest(fingerprint=name), patch.object(admission, name, return_value={}), \
                         patch.object(admission, 'build', side_effect=AssertionError('stale cannot rebuild')):
-                    self.assertFalse(old.evidence.report_matches(report, root, A))
+                    self.assertFalse(report_fixtures.replay(report, root, A))
 
     def test_previous_float_selector_still_routes_to_its_existing_inventory(self):
         import private_float_selected_record_inventory as previous

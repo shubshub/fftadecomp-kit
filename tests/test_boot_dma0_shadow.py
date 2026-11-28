@@ -10,6 +10,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import boot_dma0_shadow as dma
 import match
+import report_fixtures
 import match_evidence
 import plausible
 import test_library_units as library
@@ -82,11 +83,11 @@ class BootDma0Tests(unittest.TestCase):
                 self.assertFalse(match_evidence.report_matches(altered, root, dma.OWNER))
             for prefix in ('* ROM bytes:', '* compiled :'):
                 line = next(line for line in report.splitlines() if line.startswith(prefix))
-                self.assertFalse(match_evidence.report_matches(report.replace(line, line+'\n'+line), root, dma.OWNER))
+                self.assertFalse(report_fixtures.replay(report.replace(line, line+'\n'+line), root, dma.OWNER))
             with patch.dict(os.environ, FFTA_ROM=str(root / 'nonexistent.gba')):
                 with self.assertRaises(ValueError):
                     plausible.allowlisted_volatile_uses(root, dma.OWNER)
-                self.assertFalse(match_evidence.report_matches(report, root, dma.OWNER))
+                self.assertFalse(report_fixtures.replay(report, root, dma.OWNER))
             neighbor = root / 'src/08000714.c'
             neighbor.write_text(SOURCE)
             self.assertTrue(any(row[1] == 'volatile' for row in plausible.check_file(neighbor)))
@@ -120,7 +121,7 @@ class BootDma0Tests(unittest.TestCase):
             struct.pack_into('<H', corrupted, offset + 0x50, 0x28)
             rom.write_bytes(corrupted)
             self.assertTrue(any(row[1] == 'volatile' for row in plausible.check_file(source)))
-            self.assertFalse(match_evidence.report_matches(report, root, dma.OWNER))
+            self.assertFalse(report_fixtures.replay(report, root, dma.OWNER))
 
 
 if __name__ == '__main__':

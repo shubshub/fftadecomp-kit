@@ -486,9 +486,10 @@ class ReportTests(unittest.TestCase):
         self.enterContext(mock.patch.object(evidence.empty_body, "has_empty_body", return_value=False))
         self.assertEqual(rebuild.saved_profile_arguments(report_fixtures.carried(self.report(), self.root, BASE), self.root, BASE),
                          ["--switch-data-profile", evidence.SWITCH_U16_SCALAR_SELECTOR])
+        changed = self.report().replace(self.body.hex(), bytes(self.body[:-1] + bytes([self.body[-1] ^ 1])).hex())
+        self.assertFalse(report_fixtures.replay(changed, self.root, BASE))     # the replay's own refusal too
         with self.assertRaisesRegex(ValueError, "invalid saved profile report"):
-            rebuild.saved_profile_arguments(self.report().replace(
-                self.body.hex(), bytes(self.body[:-1] + bytes([self.body[-1] ^ 1])).hex()), self.root, BASE)
+            rebuild.saved_profile_arguments(changed, self.root, BASE)
 
     def test_status_restores_scalar_selector_for_read_only_and_write_verification(self):
         status, report, output = self.prepare_status()
@@ -519,6 +520,7 @@ class ReportTests(unittest.TestCase):
                 report.write_text(text)
                 if index == 2:
                     source.write_bytes(saved_source + b"\n")
+                self.assertFalse(report_fixtures.replay(text, self.root, BASE))   # the replay's own refusal too
                 with mock.patch.object(status.subprocess, "run") as native:
                     result = status.collect(str(self.root), True)
                     self.assertEqual(result[1], 0)

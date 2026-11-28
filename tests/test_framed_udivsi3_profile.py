@@ -22,6 +22,7 @@ sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import match
+import report_fixtures
 import match_evidence as evidence
 import match_evidence as profile
 import status
@@ -338,7 +339,7 @@ unsigned func_08000000(unsigned value) { return func_08000200(value, 1, 2, 3, 4)
                             report.replace("-O2", "-O1"),
                             report + "\n* unsigned remainder: forged"):
                 with self.subTest(changed=changed[-100:]):
-                    self.assertFalse(evidence.report_matches(changed, self.root, BASE))
+                    self.assertFalse(report_fixtures.replay(changed, self.root, BASE))
             mapping_path = self.root / "config/functions.json"
             changed_mapping = json.loads(self.mapping)
             changed_mapping[0]["end"] = f"0x{BASE + len(self.body) + 2:08X}"

@@ -68,6 +68,53 @@ def premise_line_checked_elsewhere():
     return mock.patch.object(standing_premise, "strip", side_effect=lambda report, root, address: report)
 
 
+def replay(report, root, address):
+    """match_evidence.report_matches for a fixture report, so that a refusal is the test's own.
+
+    A report without the standing frame premise line gets it first, as match.py would write it,
+    where it can carry it.  If the premise check then passes, the whole check decides, and a refusal
+    can only be for what the test changed.  If it refuses (the change under test is one the premise
+    check also sees: the ROM's bytes, the ROM bytes line or the verification line), the schema replay
+    alone must refuse the text without the line; if it accepts it, the negative would be decided by
+    the premise check alone, and this raises.
+
+    It serves negatives only.  A positive must replay a text that already carries the line (one
+    match.py wrote, or report_fixtures.carried for a fixture render): one that needed the line added
+    here raises, so a route that stopped writing the line cannot pass through a positive.  A report
+    without the line is given it again, so a test whose change is to the premise line itself (dropping
+    it, say) must call match_evidence.report_matches."""
+    import standing_premise
+    added = False
+    if standing_premise.LINE not in report:
+        try:
+            text = standing_premise.carry(report, root, address)
+        except (OSError, ValueError):
+            text = report
+        added, report = text != report, text
+    try:
+        standing_premise.strip(report, root, address)
+    except (OSError, ValueError, UnicodeError):
+        if evidence._report_matches(standing_premise.without(report), root, address):
+            raise AssertionError("only the standing frame premise check refuses this report; the replay the "
+                                 "test means accepts it")
+        return False
+    accepted = evidence.report_matches(report, root, address)
+    if accepted and added:
+        raise AssertionError("a positive on a text without the standing frame premise line: replay the "
+                             "report match.py writes, or report_fixtures.carried for a fixture render")
+    return accepted
+
+
+def assert_premise_holds(test, report, root, address):
+    """`report` passes the standing frame premise check (standing_premise.strip), so a replay that
+    refuses it refuses for a reason of its own, not for the frame premise line."""
+    import standing_premise
+    try:
+        standing_premise.strip(report, root, address)
+    except ValueError as error:
+        test.fail(f"the standing frame premise check refuses this report: {error}")
+
+
 def uncarried(report):
     """`report` without the standing frame premise line, as a profile's own replay reads it
     (match_evidence.report_matches removes the line before it calls one)."""

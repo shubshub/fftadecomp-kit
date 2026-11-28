@@ -17,6 +17,13 @@ import rebuild
 
 
 class TargetRemainderLifecycleTests(fixture.SoftwareDoubleTargetRemainderTests):
+    def fixture_rom(self):
+        """The fixture's current ROM as FFTA_ROM, so that a replay compares the report with it (a later
+        fixture() builds another ROM, so this holds only where it is entered)."""
+        rom = self.root / 'fixture.rom'
+        rom.write_bytes(self.rom)
+        return patch.dict(os.environ, {'FFTA_ROM': str(rom)})
+
     def test_native_status_write_verify_and_compiled_rebuild_roundtrip(self):
         self.fixture()
         self.native_report()
@@ -81,6 +88,7 @@ class TargetRemainderLifecycleTests(fixture.SoftwareDoubleTargetRemainderTests):
     def test_stale_saved_source_or_proof_cannot_forward_or_launch_matcher(self):
         self.fixture()
         report = self.native_report()
+        self.enterContext(self.fixture_rom())
         path = self.root / 'docs/match/08000000.md'
         source = self.root / 'src/08000000.c'
         original = source.read_text()
@@ -93,6 +101,7 @@ class TargetRemainderLifecycleTests(fixture.SoftwareDoubleTargetRemainderTests):
                 changed = report.replace(line, '* software double proof SHA-256: `' + '0'*64 + '`')
             path.write_text(changed)
             self.assertTrue(profile.target_remainder_selected(changed))
+            report_fixtures.assert_premise_holds(self, changed, self.root, BASE)   # the refusal is the change's
             with self.subTest(kind=kind), patch.object(subprocess, 'run') as invocation:
                 with self.assertRaisesRegex(ValueError, 'invalid saved profile report'):
                     rebuild.saved_profile_arguments(changed, self.root, BASE)
@@ -109,8 +118,10 @@ class TargetRemainderLifecycleTests(fixture.SoftwareDoubleTargetRemainderTests):
         del without['target_remainder']
         no_opt_in = report.replace(profile.manifest_text(self.manifest), profile.manifest_text(without))
         self.assertFalse(profile.target_remainder_selected(no_opt_in))
-        with self.assertRaises(ValueError):
-            rebuild.saved_profile_arguments(no_opt_in, self.root, BASE)
+        with self.fixture_rom():
+            report_fixtures.assert_premise_holds(self, no_opt_in, self.root, BASE)
+            with self.assertRaises(ValueError):
+                rebuild.saved_profile_arguments(no_opt_in, self.root, BASE)
         rom = self.root / 'fixture.rom';rom.write_bytes(self.rom)
         environment = dict(os.environ, FFTA_ROM=str(rom), TMPDIR=str(self.root),
                            PYTHONDONTWRITEBYTECODE='1')

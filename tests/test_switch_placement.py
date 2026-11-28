@@ -703,7 +703,7 @@ class PlacementTests(unittest.TestCase):
             for changed in (report.replace("two-constants-v2", "two-constants-v1"),
                             report + "* verification: `elf-symbol-thumb-switch-two-constants-v1`\n",
                             report + "* switch constants: two-constants-v1\n"):
-                self.assertFalse(match_evidence.report_matches(changed, root, address))
+                self.assertFalse(report_fixtures.replay(changed, root, address))
 
     def test_late_status_rebuild_and_external_prefix_exclusion(self):
         address = 0x08150002

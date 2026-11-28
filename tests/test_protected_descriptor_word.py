@@ -218,7 +218,7 @@ void func_08011000(struct Descriptor *descriptor)
         self.assertTrue(match_evidence.report_matches(report_fixtures.carried(self.report, self.root, A), self.root, A))
         path=self.root/'src/08010000.c';raw=path.read_bytes()
         try:
-            path.write_bytes(raw+b'\n');self.assertFalse(match_evidence.report_matches(self.report,self.root,A))
+            path.write_bytes(raw+b'\n');self.assertFalse(report_fixtures.replay(self.report,self.root,A))
         finally:path.write_bytes(raw)
 
 

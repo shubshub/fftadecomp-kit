@@ -17,6 +17,7 @@ HERE = Path(__file__).resolve().parents[1]
 KIT = Path(os.environ.get('FFTA_CALLBACK_RUNTIME_KIT', HERE))
 sys.path[:0] = [str(HERE / 'tools'), str(KIT / 'tools'), str(KIT / 'tests')]
 import match
+import report_fixtures
 import match_evidence as evidence
 import addressed_signed_runtime_profile as profile
 from test_addressed_signed_runtime_profile import AddressedSignedRuntimeTests, A, bl, indexes
@@ -246,16 +247,16 @@ class R2CallbackTests(unittest.TestCase):
                              'config/data_symbols.json','baserom.bin'):
                 path=root/relative; original=path.read_bytes(); path.write_bytes(original+b' ')
                 try:
-                    with self.subTest(relative=relative):self.assertFalse(evidence.report_matches(report,root,A))
+                    with self.subTest(relative=relative):self.assertFalse(report_fixtures.replay(report,root,A))
                 finally:path.write_bytes(original)
             header=root/'include/changed.h';header.write_text('/* changed synthetic header */\n')
-            try:self.assertFalse(evidence.report_matches(report,root,A))
+            try:self.assertFalse(report_fixtures.replay(report,root,A))
             finally:header.unlink()
             with patch.object(profile,'runtime_fingerprint',return_value={'stale':True}):
-                self.assertFalse(evidence.report_matches(report,root,A))
-            self.assertFalse(evidence.report_matches(report.replace(profile.CALLBACK_SELECTOR,profile.DATA_SELECTOR),root,A))
+                self.assertFalse(report_fixtures.replay(report,root,A))
+            self.assertFalse(report_fixtures.replay(report.replace(profile.CALLBACK_SELECTOR,profile.DATA_SELECTOR),root,A))
             forged=copy.deepcopy(result);forged['manifest']['callback']['sites'][0][4]='other'
-            self.assertFalse(evidence.report_matches(profile.render(forged),root,A))
+            self.assertFalse(report_fixtures.replay(profile.render(forged),root,A))
 
     def test_build_rejects_midrun_source_and_producer_change(self):
         with self.build_fixture() as (root, f, commands, capture):

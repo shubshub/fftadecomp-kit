@@ -13,6 +13,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import bios_bg_affine_set_profile as affine
 import match
+import report_fixtures
 import match_evidence
 import named_data_buffer_profile as buffers
 import owner_admission_profile as owner
@@ -84,7 +85,7 @@ class BgAffineTransparentLeafNativeTests(unittest.TestCase):
                     with patch.object(owner, 'build', side_effect=AssertionError('unexpected replay')) as replay:
                         for bad in (report + f'\n* verification: `{buffers.BG_AFFINE_SCHEMA}`\n',
                                     report.replace('* owner runtime evidence: `', '* stale owner runtime evidence: `')):
-                            self.assertFalse(match_evidence.report_matches(bad, root, A))
+                            self.assertFalse(report_fixtures.replay(bad, root, A))
                         source=root/'src/08010000.c'
                         source.write_text(SOURCE+'\n')
                         self.assertFalse(match_evidence.report_matches(report, root, A))

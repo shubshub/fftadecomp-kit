@@ -295,16 +295,16 @@ class PrivateFloatPackAdmissionTests(unittest.TestCase):
                 path=root/relative;old=path.read_bytes();path.write_bytes(old+b' ')
                 try:
                     with self.subTest(stale=relative),patch.object(admission,'build',side_effect=AssertionError('stale must not compile')):
-                        self.assertFalse(evidence.report_matches(report,root,ADDRESS))
+                        self.assertFalse(report_fixtures.replay(report,root,ADDRESS))
                 finally:path.write_bytes(old)
             for field in ('toolchain','runtime'):
                 with self.subTest(stale=field),patch.object(admission,field+'_fingerprint',return_value={}), \
                         patch.object(admission,'build',side_effect=AssertionError('stale must not compile')):
-                    self.assertFalse(evidence.report_matches(report,root,ADDRESS))
+                    self.assertFalse(report_fixtures.replay(report,root,ADDRESS))
             with patch.object(admission,'producer_fingerprint',return_value={}),patch.object(admission,'build',side_effect=AssertionError('stale must not compile')):
-                self.assertFalse(evidence.report_matches(report,root,ADDRESS))
+                self.assertFalse(report_fixtures.replay(report,root,ADDRESS))
             with patch.object(admission,'build',side_effect=ValueError('fresh helper/source proof differs')):
-                self.assertFalse(evidence.report_matches(report,root,ADDRESS))
+                self.assertFalse(report_fixtures.replay(report,root,ADDRESS))
 
     def test_reports_fail_closed_for_mixed_duplicate_forged_and_recursive_evidence(self):
         with self.project() as (root,fixture):
@@ -321,9 +321,9 @@ class PrivateFloatPackAdmissionTests(unittest.TestCase):
                 report.replace(admission.SELECTOR,'other-selector')]
             for number,changed in enumerate(variants):
                 with self.subTest(number=number),patch.object(admission,'build',return_value=result):
-                    self.assertFalse(evidence.report_matches(changed,root,ADDRESS))
+                    self.assertFalse(report_fixtures.replay(changed,root,ADDRESS))
             def recurse(*args,**kwargs):
-                self.assertFalse(evidence.report_matches(report,root,ADDRESS))
+                self.assertFalse(report_fixtures.replay(report,root,ADDRESS))
                 return result
             with patch.object(admission,'build',side_effect=recurse):
                 self.assertTrue(evidence.report_matches(report_fixtures.carried(report, root, ADDRESS), root, ADDRESS))
@@ -342,7 +342,7 @@ class PrivateFloatPackAdmissionTests(unittest.TestCase):
             self.assertIn('"linked_elf_sha256":',report)
             self.assertIn('"producer_source_sha256":',report)
             with self.fake_native(root,fixture,findings=True):
-                self.assertFalse(evidence.report_matches(report,root,ADDRESS))
+                self.assertFalse(report_fixtures.replay(report,root,ADDRESS))
 
 
 class PrivateFloatTerminalAlignmentTests(unittest.TestCase):

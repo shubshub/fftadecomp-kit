@@ -406,7 +406,7 @@ class ReportTests(unittest.TestCase):
         return report
 
     def valid(self, report):
-        return evidence.report_matches(report, self.root, BASE)
+        return report_fixtures.replay(report, self.root, BASE)
 
     def test_report_revalidates(self):
         self.assertTrue(self.valid(self.report()))

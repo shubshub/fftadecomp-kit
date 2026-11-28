@@ -89,10 +89,10 @@ class BgAffineSetNativeTests(unittest.TestCase):
                                       ('-44,-24,1]]', '-44,-20,1]]'),
                                       ('"wrapper_hex":"0edf7047"', '"wrapper_hex":"0bdf7047"')):
                     self.assertIn(before, report)
-                    self.assertFalse(match_evidence.report_matches(
+                    self.assertFalse(report_fixtures.replay(
                         report.replace(before, after), root, A))
                 (root/'src/08010000.c').write_text(SOURCE + '\n')
-                self.assertFalse(match_evidence.report_matches(report, root, A))
+                self.assertFalse(report_fixtures.replay(report, root, A))
 
 
 if __name__ == '__main__':

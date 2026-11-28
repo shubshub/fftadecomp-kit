@@ -15,6 +15,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB
 import match
+import report_fixtures
 import standing_premise
 import match_evidence
 import status
@@ -128,7 +129,7 @@ class NativeTests(unittest.TestCase):
             self.assertTrue(match_evidence.report_matches(report,root,address))
             self.assertEqual(driver.selector_for_report(report),odd.SELECTOR)
             result['manifest']['operands']['positive_odd_divisor'] = [1,65535]
-            self.assertFalse(match_evidence.report_matches(driver.render(result),root,address))
+            self.assertFalse(report_fixtures.replay(driver.render(result),root,address))
             src.write_text('extern int func_08142950(int, int);\n'+SOURCE.replace(
                 '(short)func_08002804() % (range + 1)', 'func_08142950((short)func_08002804(), range + 1)'))
             self.assertFalse(match_evidence.report_matches(report,root,address))

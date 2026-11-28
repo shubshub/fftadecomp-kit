@@ -343,6 +343,45 @@ class CarryStripTests(unittest.TestCase):
         self.assertEqual(standing.carry(report_text(body), arm_root.path, BASE), report_text(body))
 
 
+class ReplayFixtureTests(unittest.TestCase):
+    """report_fixtures.replay, which the other modules' negatives go through: it returns the whole
+    check's verdict only when that cannot be the premise check's alone, and raises otherwise."""
+
+    def setUp(self):
+        self.root = FixtureRoot(self, {BASE: FRAMED, BASE + 0x100: FRAMELESS}).path
+        self.uncarried = report_text(FRAMED)
+        self.carried = standing.carry(self.uncarried, self.root, BASE)
+        self.frameless = report_text(FRAMELESS, BASE + 0x100, "elf-symbol-cfg-leaf-v2")
+
+    def replay(self, report, schema_accepts, address=BASE):
+        import report_fixtures
+        with mock.patch.object(evidence, "_report_matches", return_value=schema_accepts) as schema:
+            return report_fixtures.replay(report, self.root, address), schema
+
+    def test_a_carried_positive_and_a_frameless_one_pass(self):
+        self.assertEqual(self.replay(self.carried, True)[0], True)
+        self.assertEqual(self.replay(self.frameless, True, BASE + 0x100)[0], True)
+
+    def test_a_positive_that_needed_the_line_added_raises(self):
+        with self.assertRaisesRegex(AssertionError, "positive on a text without the standing frame premise line"):
+            self.replay(self.uncarried, True)
+
+    def test_a_negative_the_schema_replay_refuses_is_refused(self):
+        self.assertEqual(self.replay(self.uncarried, False)[0], False)
+        twice = self.carried.replace(standing.LINE, standing.LINE + "\n" + standing.LINE, 1)
+        refused, schema = self.replay(twice, False)
+        self.assertFalse(refused)
+        self.assertNotIn(standing.LINE, schema.call_args.args[0])      # the schema replay saw the text without it
+
+    def test_a_negative_only_the_premise_check_refuses_raises(self):
+        twice = self.carried.replace(standing.LINE, standing.LINE + "\n" + standing.LINE, 1)
+        with self.assertRaisesRegex(AssertionError, "only the standing frame premise check refuses"):
+            self.replay(twice, True)
+        moved_rom = self.carried.replace(FRAMED.hex(), "01b5" + FRAMED.hex()[4:], 1)    # ROM bytes differ
+        with self.assertRaisesRegex(AssertionError, "only the standing frame premise check refuses"):
+            self.replay(moved_rom, True)
+
+
 class ReaderTests(unittest.TestCase):
     def setUp(self):
         self.root = FixtureRoot(self, {BASE: FRAMED}).path

@@ -239,7 +239,7 @@ class DataLiteralTests(unittest.TestCase):
             with self.subTest(path=relative):
                 try:
                     path.write_bytes(changed)
-                    self.assertFalse(evidence.report_matches(report, self.root, BASE))
+                    self.assertFalse(report_fixtures.replay(report, self.root, BASE))
                 finally:
                     path.write_bytes(original)
                 self.assertTrue(evidence.report_matches(report, self.root, BASE))

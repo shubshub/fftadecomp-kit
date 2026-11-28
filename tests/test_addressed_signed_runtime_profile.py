@@ -434,7 +434,7 @@ class AddressedSignedRuntimeTests(unittest.TestCase):
                     self.assertFalse(evidence.report_matches(report.replace(profile.READONLY_SELECTOR,profile.SELECTOR),root,A))
                     self.assertFalse(evidence.report_matches(report.replace('one readable aligned','two readable aligned'),root,A))
                     forged=copy.deepcopy(result);forged['manifest']['frame']['entry_stack']['words']=[1]
-                    self.assertFalse(evidence.report_matches(profile.render(forged),root,A))
+                    self.assertFalse(report_fixtures.replay(profile.render(forged),root,A))
 
     def test_readonly_word0_fresh_build_binds_context_and_runtime(self):
         scratch=Path(__file__).resolve().parents[1]/'build/tests';scratch.mkdir(parents=True,exist_ok=True)
@@ -504,9 +504,9 @@ class AddressedSignedRuntimeTests(unittest.TestCase):
                                               ('symbols/functions.txt',b''),('config/data_symbols.json',b'{"stale":"0x02000000"}'),
                                               ('baserom.bin',b'changed')]:
                         path=root/relative;saved=path.read_bytes();path.write_bytes(payload)
-                        try:self.assertFalse(evidence.report_matches(report,root,A))
+                        try:self.assertFalse(report_fixtures.replay(report,root,A))
                         finally:path.write_bytes(saved)
-                    self.assertFalse(evidence.report_matches(report+'* verification: `other`\n',root,A))
+                    self.assertFalse(report_fixtures.replay(report+'* verification: `other`\n',root,A))
                     altered=report.replace('conditional returning ARM ABI','numeric division theorem')
                     self.assertFalse(evidence.report_matches(altered,root,A))
                     header=root/'include/stale.h';header.write_text('/* changed header */\n')
@@ -779,19 +779,19 @@ class AddressedSignedRuntimeTests(unittest.TestCase):
             for relative in ('config/data_symbols.json','config/functions.json','symbols/functions.txt',
                              'src/08010000.c','baserom.bin'):
                 p=root/relative;old=p.read_bytes();p.write_bytes(old+b' ')
-                try:self.assertFalse(evidence.report_matches(report,root,A))
+                try:self.assertFalse(report_fixtures.replay(report,root,A))
                 finally:p.write_bytes(old)
             p=root/'include/new.h';p.write_text('/* stale */\n')
-            try:self.assertFalse(evidence.report_matches(report,root,A))
+            try:self.assertFalse(report_fixtures.replay(report,root,A))
             finally:p.unlink()
             with patch.object(profile,'runtime_fingerprint',return_value={'stale':True}):
-                self.assertFalse(evidence.report_matches(report,root,A))
+                self.assertFalse(report_fixtures.replay(report,root,A))
             with patch.object(profile,'toolchain_fingerprint',return_value=[]):
-                self.assertFalse(evidence.report_matches(report,root,A))
+                self.assertFalse(report_fixtures.replay(report,root,A))
             forged=copy.deepcopy(result);forged['manifest']['data_bindings'][0][2]=4
-            self.assertFalse(evidence.report_matches(profile.render(forged),root,A))
+            self.assertFalse(report_fixtures.replay(profile.render(forged),root,A))
             forged=copy.deepcopy(result);forged['manifest']['producer_source_sha256']['match.py']='0'*64
-            self.assertFalse(evidence.report_matches(profile.render(forged),root,A))
+            self.assertFalse(report_fixtures.replay(profile.render(forged),root,A))
             objects=root/'config/data_symbols.json';old=objects.read_bytes()
             def mutation(*args,**kwargs):objects.write_bytes(old+b' ')
             with patch.object(match,'_run_replay_process',side_effect=mutation):
@@ -824,7 +824,7 @@ class AddressedSignedRuntimeTests(unittest.TestCase):
                     self.assertTrue(push.check_matches(str(root)))
                     self.assertIn('--verify',gate.call_args[0][0])
             self.assertFalse(evidence.report_matches(report.replace(profile.DATA_SELECTOR,profile.SELECTOR),root,A))
-            self.assertFalse(evidence.report_matches(report+'* verification: `other`\n',root,A))
+            self.assertFalse(report_fixtures.replay(report+'* verification: `other`\n',root,A))
             for option,value in [('--signed-runtime-profile',match.signed_divmod.SELECTOR),
                                  ('--function-address-profile',match.function_thunk.SELECTOR),('--mode','arm')]:
                 with (patch.object(profile,'build',side_effect=AssertionError('must not build')),

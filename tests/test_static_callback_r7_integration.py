@@ -145,7 +145,7 @@ class IntegrationTests(unittest.TestCase):
         r=result();report=owner.render(A,r)
         with patch.object(owner,'build',return_value=r):
             for changed in (report.replace('synthetic-source','different-source'),report.replace('* owner runtime: '+r7.SELECTOR,'* owner runtime: '+default.SELECTOR),report.replace('* compiled : `','* compiled : `00')):
-                self.assertFalse(match_evidence.report_matches(changed,CASE/'scratch',A))
+                self.assertFalse(report_fixtures.replay(changed,CASE/'scratch',A))
         with self.assertRaisesRegex(ValueError,'original ELF identity'):
             owner.fingerprint(A,r[0],r[1],r[2],r[3],r[4],r[5],r[6])
 

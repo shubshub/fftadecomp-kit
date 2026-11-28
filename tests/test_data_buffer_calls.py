@@ -23,6 +23,7 @@ sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import match
+import report_fixtures
 import match_evidence as evidence
 import data_buffer_profile as data_buffer
 from test_buffer_loop_replay import counted
@@ -204,7 +205,7 @@ class DataBufferNativeTests(unittest.TestCase):
     def replays(self, report, root=None):
         root = root or self.plain
         with patch.dict(os.environ, FFTA_ROM=str(root / "baserom.bin")):
-            return evidence.report_matches(report, root, A)
+            return report_fixtures.replay(report, root, A)
 
     def assertRefused(self, root, message):
         code, output, report = run(root)
@@ -644,7 +645,7 @@ class DataBufferScanTests(unittest.TestCase):
         import owner_admission_profile as owner
         self.assertEqual(data_buffer.HARDWARE_WINDOW, owner.NUMERIC_HARDWARE)
         # Other schemas never route here, and a report carrying these fields never reaches them.
-        self.assertFalse(evidence.report_matches(
+        self.assertFalse(report_fixtures.replay(
             f"* verification: `{evidence.STACK_BUFFER_SCHEMA}`\n* data buffer calls: x\n"
             "**MATCH - byte identical** - 4/4 bytes", ROOT, A))
 

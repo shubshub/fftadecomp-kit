@@ -455,7 +455,7 @@ class CompiledNumericOwnerTests(unittest.TestCase):
                        self.report.replace(owner.NUMERIC_HARDWARE_CONTRACT, 'forged')):
             with self.subTest(forged=forged != self.report):
                 self.assertNotEqual(forged, self.report)
-                self.assertFalse(match_evidence.report_matches(forged, self.root, A))
+                self.assertFalse(report_fixtures.replay(forged, self.root, A))
 
 
 if __name__ == '__main__':

@@ -244,12 +244,12 @@ void func_08011000(unsigned char *bytes, void (*callback)(unsigned char *))
     def test_fresh_source_report_and_original_elf_identity(self):
         self.assertTrue(match_evidence.report_matches(report_fixtures.carried(self.report, self.root, A), self.root, A))
         altered=self.report.replace('"original_elf_sha256":"','"original_elf_sha256":"0')
-        self.assertFalse(match_evidence.report_matches(altered,self.root,A))
+        self.assertFalse(report_fixtures.replay(altered,self.root,A))
         for name in ('src/08010000.c','config/functions.json','symbols/functions.txt','config/data_symbols.json'):
             path=self.root/name;raw=path.read_bytes()
             try:
                 path.write_bytes(raw+b'\n')
-                self.assertFalse(match_evidence.report_matches(self.report,self.root,A))
+                self.assertFalse(report_fixtures.replay(self.report,self.root,A))
             finally:path.write_bytes(raw)
 
 

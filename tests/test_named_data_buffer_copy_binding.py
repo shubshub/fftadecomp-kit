@@ -212,7 +212,7 @@ class NativeTests(unittest.TestCase):
                 path=self.root/name;raw=path.read_bytes()
                 try:
                     path.write_bytes(raw+b'\n')
-                    self.assertFalse(match_evidence.report_matches(report,self.root,A))
+                    self.assertFalse(report_fixtures.replay(report,self.root,A))
                 finally:path.write_bytes(raw)
         for malformed in (report+f'* verification: `{buffers.SCHEMA}`\n',report+'* buffer calls: legacy\n'):
             with self.assertRaises(ValueError):owner.selector_for_report(malformed)

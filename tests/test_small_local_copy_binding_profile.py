@@ -118,7 +118,7 @@ class BindingTests(unittest.TestCase):
                 path=self.root/name;raw=path.read_bytes()
                 try:
                     path.write_bytes(raw+b'\n')
-                    with self.subTest(name=name):self.assertFalse(match_evidence.report_matches(report,self.root,A))
+                    with self.subTest(name=name):self.assertFalse(report_fixtures.replay(report,self.root,A))
                 finally:path.write_bytes(raw)
 
     def test_old_selector_and_mixed_report_refused(self):

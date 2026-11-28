@@ -18,6 +18,7 @@ TOOLS = Path(__file__).resolve().parents[1] / "tools"
 sys.path.insert(0, str(TOOLS))
 import empty_body_profile as empty_body
 import match
+import report_fixtures
 import match_evidence as evidence
 import plausible
 import push
@@ -244,7 +245,7 @@ class EmptyBodyTests(unittest.TestCase):
             for variant in (self.report.replace(line + "\n", ""), self.report + line + "\n",
                             self.report.replace(line, " " + line), self.report.replace(line, line + " altered")):
                 with self.subTest(line=line):
-                    self.assertFalse(evidence.report_matches(variant, self.root, self.address))
+                    self.assertFalse(report_fixtures.replay(variant, self.root, self.address))
         for extra in ("**NOT MATCHING - bytes differ** - 0/2 bytes", "**MATCH - byte identical** - 2/2 bytes",
                       "HAND-ASM", "IMPLAUSIBLE", "* stack frame: forged"):
             with self.subTest(extra=extra):
@@ -266,7 +267,7 @@ class EmptyBodyTests(unittest.TestCase):
                      (self.root / "src/duplicate/08000000.c", self.source_text)]
         for path, content in mutations:
             with self.subTest(path=path), self.changed(path, content):
-                self.assertFalse(evidence.report_matches(self.report, self.root, self.address))
+                self.assertFalse(report_fixtures.replay(self.report, self.root, self.address))
                 with contextlib.redirect_stdout(io.StringIO()):
                     self.assertFalse(push.check_plausible(str(self.root)))
 
