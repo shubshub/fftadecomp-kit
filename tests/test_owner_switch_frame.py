@@ -88,6 +88,18 @@ class Assembled(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, INSPECTED):
             data_buffer.owner_switch_frame(proof, calls, {}, instructions)
 
+    def test_a_summarised_division_site_never_stands_in_for_the_inspected_call(self):
+        # Under the division leaf, a call to a pinned runtime entry is that leaf's to count (or not).
+        import signed_remainder_leaf_profile as leaf
+        _, proof, instructions, calls = self.scalar()
+        site = min(calls)
+        for name in ('__divsi3', '__modsi3', '__udivsi3', '__umodsi3'):
+            for evidence in (True, False):
+                with self.subTest(runtime=name, evidence=evidence), leaf.activated(), \
+                        patch.object(leaf.EVIDENCE, 'enabled', evidence), \
+                        self.assertRaisesRegex(ValueError, INSPECTED):
+                    data_buffer.owner_switch_frame(proof, {**calls, site: leaf.ENTRIES[name]}, {}, instructions)
+
     def test_only_the_retried_shape_takes_it(self):
         # match.py retries only an owner with a call and a fixed frame; replay must not admit others.
         _, proof, instructions, calls = self.scalar()
