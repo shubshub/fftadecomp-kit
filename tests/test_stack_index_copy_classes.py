@@ -122,6 +122,24 @@ class CopyClassTests(unittest.TestCase):
         self.assertTrue(together(analysis.join_states(state((3, 4)), state((3, 4)), 0x08010000, 1), 3, 4))
 
 
+class FarJumpTests(unittest.TestCase):
+    def test_a_far_jump_takes_lr_out_of_its_copy_class(self):
+        # bl +4 (a same-function far jump to 0x08010008); LR := the continuation, so it holds no copy.
+        # far_jump_profile proves LR dead after the jump, so only the state itself can show this.
+        address = 0x08010000
+        data = bytes.fromhex('00f002f8') + bytes.fromhex('c046') * 4
+        analysis = sip.Analysis(data, address, {}, {}, {})
+        analysis.far_jumps = {address: address + 8}
+        labels = list(range(16))
+        labels[14] = 4                                  # mov lr, r4 earlier: LR in r4's class
+        state = sip.State((), frozenset(), tuple([sip.TOP] * 16), tuple([None] * 16), None,
+                          sip.classes(labels))
+        (target, after), = analysis.step(state, address)
+        self.assertEqual(target, address + 8)
+        self.assertNotEqual(after.same[14], after.same[4])
+        self.assertEqual(after.same[:14], state.same[:14])
+
+
 # 0x080EF970's shape in C: the mode stays live after the index is taken from it.
 MODE_SOURCE = """typedef unsigned char u8;
 typedef unsigned int u32;
