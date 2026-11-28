@@ -251,13 +251,24 @@ class FrameExitScratchNativeTests(unittest.TestCase):
         self.assertIsNone(getattr(self.prove(root)()[1], "function_exit_scratch", None))
 
     def test_callee_return_keeps_its_refusal(self):
+        # The callee leaves an address of its own frame in R3.  The released-scratch rule hands it back to
+        # the owner as a released address (released_scratch_profile.callee_return), and the owner's return
+        # still holds it, so the owner's return refuses, with the frame policy on or off: the frame rule
+        # drops only the owner's own frame addresses.  Without the released-scratch rule the callee's own
+        # return refuses, as before.
+        import released_scratch_profile as released
         prove = self.prove(self.fixture("own", OWN, PLAIN % dict(size=4, last=3, extra="")))
         with self.assertRaises(ValueError) as on:
             prove()
         with patch.object(function_exit.FRAME_POLICY, "enabled", False), self.assertRaises(ValueError) as off:
             prove()
         self.assertEqual(str(on.exception), str(off.exception))
-        self.assertIn("buffer callee 0x08000400", str(on.exception))
+        self.assertEqual(str(on.exception), ESCAPE)
+        with patch.object(released, "callee_return", lambda proof, address, site, aliases, **_: aliases), \
+                self.assertRaises(ValueError) as unreleased:
+            prove()
+        self.assertIn("buffer callee 0x08000400", str(unreleased.exception))
+        self.assertIn(ESCAPE, str(unreleased.exception))
 
 
 if __name__ == "__main__":
