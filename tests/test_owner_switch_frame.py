@@ -427,6 +427,62 @@ class Native(unittest.TestCase):
         self.assertFalse(self.replays('buffer', '\n'.join(forged) + '\n'))
 
 
+# A framed owner switch whose calls are an uninspected scalar call and summarised division runtimes.
+DIVISION_SWITCH = remainder_tests.HEADER + """extern void func_08000400(u32 a, u32 b, u32 c, u32 d, u32 e);
+u32 func_08000200(u32 phase, int value, int other)
+{
+    switch (phase) {
+    case 0:
+        data_02000000[2] = value / 10;
+        return other % 10;
+    case 1:
+        func_08000400(1, 2, 3, 4, 5);
+        return 1;
+    case 2:
+        return other / 3;
+    case 3:
+        data_02000000[1] = value % 7;
+        return 3;
+    case 4:
+        return value / 100;
+    }
+    return 0;
+}
+"""
+
+
+@unittest.skipUnless(data_calls.tools_present(), "fixed compiler and ARM tools required")
+class SummarisedDivision(unittest.TestCase):
+    """A summarised division runtime site is the inspected call only under the division leaf's own rule."""
+
+    @classmethod
+    def setUpClass(cls):
+        runtime = remainder_tests.approved_rom()
+        if runtime is None:
+            raise unittest.SkipTest('FFTA_ROM must reference the approved ROM')
+        scratch = Path(os.environ.get('FFTA_TEST_SCRATCH', ROOT / 'build'))
+        scratch.mkdir(parents=True, exist_ok=True)
+        cls.temporary = tempfile.TemporaryDirectory(prefix='owner_switch_frame_division_', dir=scratch)
+        cls.root = remainder_tests.build(Path(cls.temporary.name) / 'division', DIVISION_SWITCH,
+                                         [('func_08000400', 'bx lr')], runtime=runtime)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.temporary.cleanup()
+
+    def test_the_leaf_evidence_admits_it_under_the_data_buffer_schema(self):
+        code, output = remainder_tests.cli(self.root)
+        self.assertEqual(code, 0, output)
+        self.assertIn('verdict MATCH - byte identical', output)
+
+    def test_without_the_leaf_evidence_this_schema_does_not_stand_in(self):
+        import signed_remainder_leaf_profile as leaf
+        with patch.object(leaf.EVIDENCE, 'enabled', False):
+            code, output = remainder_tests.cli(self.root)
+        self.assertIn('owner-switch data-buffer proof: ' + INSPECTED, str(code))
+        self.assertNotIn('MATCH - byte identical', output)
+
+
 def real_root(root, rom):
     """080C2314's source with the approved ROM, its callees' map rows and its one data symbol."""
     root = Path(root)
