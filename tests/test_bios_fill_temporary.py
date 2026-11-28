@@ -503,7 +503,9 @@ class RomTests(unittest.TestCase):
                 ("r1 in the slot as well", shape[:3] + [ADD_R1_SP_38] + shape[4:],
                  "passes r1 sp\\+0x38, which reaches"),
                 ("a register offset from r3", [add_r3_sp_38, MOVS_R0_0, 0x5258] + shape[3:],
-                 "indexes the stack by a register inside the fill")):
+                 "indexes the stack by a register inside the fill"),
+                ("r3 as the stored value, not the base", [ADD_R1_SP_38, add_r3_sp_38, 0x800B] + shape[3:],
+                 "passes r3 sp\\+0x38, which reaches")):
             with self.subTest(label=label):
                 rom, compiled, one = window(items)
                 with self.assertRaisesRegex(proof.ProofError, reason):
