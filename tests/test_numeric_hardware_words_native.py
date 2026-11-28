@@ -94,12 +94,12 @@ class NumericHardwareWordNativeTests(unittest.TestCase):
                     self.assertIn(text, report)
                     for forged in (text.replace(str(0x0600B1E0), str(0x0600B1E4)),
                                    f'{text},[{row[0]+4},{0x0600B1E0},{json.dumps(row[2])}]'):
-                        self.assertFalse(match_evidence.report_matches(report.replace(text, forged), root, A))
+                        self.assertFalse(report_fixtures.replay(report.replace(text, forged), root, A))
                     record = json.dumps(dict(numeric_hardware_words=proof['numeric_hardware_words']),
                                         sort_keys=True, separators=(',', ':'))[1:-1] + ','
                     dropped = report.replace(record, '')
                     self.assertNotEqual(dropped, report)
-                    self.assertFalse(match_evidence.report_matches(dropped, root, A))
+                    self.assertFalse(report_fixtures.replay(dropped, root, A))
                     check = subprocess.run([sys.executable, str(Path(match.__file__)),
                         '--root', str(root), f'0x{A:08X}', '--owner-runtime-profile', selector],
                         text=True, capture_output=True)

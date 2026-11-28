@@ -233,14 +233,14 @@ class SelfCallReportTests(unittest.TestCase):
     def test_a_second_verification_line_is_rejected(self):
         good = self.report()
         extra = f'* verification: `{evidence.SCHEMA}`'
-        self.assertFalse(evidence.report_matches(good.replace('\n', f'\n{extra}\n', 1), self.root, A))
+        self.assertFalse(report_fixtures.replay(good.replace('\n', f'\n{extra}\n', 1), self.root, A))
 
     def test_changed_mapping_or_rom_is_rejected(self):
         good = self.report()
         rom = bytearray(self.rom)
         rom[A - match.ROM_BASE + 10] ^= 1
         (self.root / 'baserom.bin').write_bytes(rom)
-        self.assertFalse(evidence.report_matches(good, self.root, A))
+        self.assertFalse(report_fixtures.replay(good, self.root, A))
         (self.root / 'baserom.bin').write_bytes(self.rom)
         self.assertTrue(evidence.report_matches(good, self.root, A))
         mapping = self.root / 'config/functions.json'

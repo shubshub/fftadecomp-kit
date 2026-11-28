@@ -1290,8 +1290,11 @@ class ReportTests(unittest.TestCase):
                         thunk_switch_selector=selector)
                     self.assertEqual(rebuild.saved_profile_arguments(report_fixtures.carried(complete, directory, BASE), directory, BASE),
                                      ['--switch-data-profile', selector])
+                    # the lines alone are no saved report: refused by the replay, not the premise check
+                    lines_only = report_fixtures.carried('\n'.join(good), directory, BASE)
+                    report_fixtures.assert_premise_holds(self, lines_only, directory, BASE)
                     with self.assertRaisesRegex(ValueError, 'invalid saved profile report'):
-                        rebuild.saved_profile_arguments('\n'.join(good), directory, BASE)
+                        rebuild.saved_profile_arguments(lines_only, directory, BASE)
                     # Replay refuses a manifest stripped of the marker, even re-signed.
                     bad = copy.deepcopy(manifest); bad.pop('thunk_policy')
                     self.assertFalse(valid(self.lines(f, selector, manifest=bad)))

@@ -2,6 +2,7 @@ import argparse
 import contextlib
 import copy
 import report_fixtures
+import standing_premise
 import hashlib
 import io
 import json
@@ -392,21 +393,26 @@ class RealSourceTests(unittest.TestCase):
 
     def test_strict_report_routing_and_canonical_serialization(self):
         report = self.build_report()
-        altered = []
+        altered = []                       # (changed text, whether the change is to the standing premise line)
         for line in report.splitlines():
             if line.startswith("*"):
-                altered += [report.replace(line + "\n", "", 1), report + line + "\n",
-                            report.replace(line, " " + line, 1)]
-        altered += [report.replace(profile.SCHEMA, profile.SCHEMA + "-future"),
+                altered += [(variant, line == standing_premise.LINE) for variant in
+                            (report.replace(line + "\n", "", 1), report + line + "\n",
+                             report.replace(line, " " + line, 1))]
+        altered += [(variant, False) for variant in (
+                    report.replace(profile.SCHEMA, profile.SCHEMA + "-future"),
                     report.replace(profile.SELECTOR, "two-constants-v1"),
                     report + "* unknown: unbound\n", report + "* buffer calls: mixed\n",
                     report.replace("* switch constants:", "*\tswitch constants:"),
-                    report.replace(profile.SCHEMA, match_evidence.SWITCH_SCHEMA)]
+                    report.replace(profile.SCHEMA, match_evidence.SWITCH_SCHEMA))]
         with patch.object(profile, "_build_from_source", wraps=profile._build_from_source), \
                 patch.object(match_evidence, "switch_report_matches") as old:
-            for changed in altered:
-                with self.subTest(changed=changed[-100:]):
-                    self.assertFalse(match_evidence.report_matches(changed, self.root, ADDRESS))
+            for changed, premise_line in altered:
+                with self.subTest(changed=changed[-100:], premise_line=premise_line):
+                    # a change to the premise line itself is the premise check's to refuse; every other
+                    # change must be refused by the replay itself (report_fixtures.replay)
+                    check = match_evidence.report_matches if premise_line else report_fixtures.replay
+                    self.assertFalse(check(changed, self.root, ADDRESS))
             old.assert_not_called()
         manifest_line = next(line for line in report.splitlines() if line.startswith("* switch constants manifest:"))
         encoded = manifest_line.split("`", 2)[1]

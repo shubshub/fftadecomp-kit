@@ -17,6 +17,7 @@ KIT = Path(os.environ.get('FFTA_CALLBACK_RUNTIME_KIT', CASE))
 SWITCH = KIT / 'tools'
 sys.path[:0] = [str(SWITCH), str(KIT / 'tests')]
 import match
+import report_fixtures
 import match_evidence as evidence
 import addressed_signed_runtime_profile as profile
 import test_addressed_r2_callback as legacy
@@ -206,7 +207,7 @@ class R0SlotTests(unittest.TestCase):
                 finally: path.write_bytes(prior)
             result = profile.build(root, A, selector=profile.CALLBACK_SELECTOR)
             result['manifest']['callback']['sites'][0][5]['argument_setup'][1]['immediate'] = 17
-            self.assertFalse(evidence.report_matches(profile.render(result), root, A))
+            self.assertFalse(report_fixtures.replay(profile.render(result), root, A))
             with patch.object(profile, 'runtime_fingerprint', return_value={'stale': True}):
                 self.assertFalse(evidence.report_matches(report, root, A))
             self.assertTrue(commands)

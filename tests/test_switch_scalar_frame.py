@@ -278,7 +278,7 @@ class ScalarFrameTests(unittest.TestCase):
             ]
             for name, changed in malformed:
                 with self.subTest(name=name), patch.object(match_evidence, "switch_report_matches") as fallback:
-                    self.assertFalse(match_evidence.report_matches(changed, root, 0x08000000))
+                    self.assertFalse(report_fixtures.replay(changed, root, 0x08000000))
                     fallback.assert_not_called()
                 record("schema_rejections", name)
             self.assertNotEqual(profile.fingerprint(0x08000000, result, self.policy),

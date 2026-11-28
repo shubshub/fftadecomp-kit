@@ -295,7 +295,7 @@ class UnsignedDivmodCompositionTests(unittest.TestCase):
                 report+'* signed runtime: numeric-divmod-v1\n',report.replace('* unsigned runtime evidence: `','* unsigned runtime evidence: `{"duplicate":1,')]
             for changed in variants:
                 with self.subTest(report=changed[:100]),patch.object(profile,'build',side_effect=AssertionError('no rebuild')) as build:
-                    self.assertFalse(evidence.report_matches(changed,self.root,A));build.assert_not_called()
+                    self.assertFalse(report_fixtures.replay(changed,self.root,A));build.assert_not_called()
 
     def test_09_status_and_publisher_delegate_exact_explicit_selector(self):
         with self.build_fixture() as (f,commands,compiler):

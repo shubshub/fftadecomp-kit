@@ -258,7 +258,7 @@ class NativeWordCallbackLifecycleTests(unittest.TestCase):
             self.assertTrue(evidence.report_matches(report_fixtures.carried(report, root, ROOT), root, ROOT))
             self.assertEqual(len(runner.commands),4)
             altered=report.replace('"abi_conditional":"ordinary-arm-normal-return-r0-word-v1"','"abi_conditional":"forged"',1)
-            self.assertFalse(evidence.report_matches(altered,root,ROOT))
+            self.assertFalse(report_fixtures.replay(altered,root,ROOT))
 
     def test_build_source_header_maps_and_elf_freshness(self):
         env=environment()

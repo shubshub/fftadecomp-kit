@@ -137,7 +137,7 @@ class ClosureAssertions:
         self.assertTrue(evidence.report_matches(report, root, BASE), "the untampered report must replay")
         for name, text in tampers(report).items():
             with self.subTest(tamper=name):
-                self.assertFalse(evidence.report_matches(text, root, BASE))
+                self.assertFalse(report_fixtures.replay(text, root, BASE))
 
 
 @unittest.skipUnless(Path(os.path.expandvars(match.DEFAULT_CC)).is_file(), "agbcc required")

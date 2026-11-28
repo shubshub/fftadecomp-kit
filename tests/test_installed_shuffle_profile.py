@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import installed_copy_effects as installed
 import installed_shuffle_profile as shuffle
 import match
+import report_fixtures
 import standing_premise
 import match_evidence
 import signed_divmod_profile as driver
@@ -302,7 +303,7 @@ class NativeTests(unittest.TestCase):
         self.assertEqual((counts[1], counts[3], counts[4]), (1, 132, []))
         forged = copy.deepcopy(self.result)
         forged['manifest']['unconditional_permutation_proved'] = True
-        self.assertFalse(match_evidence.report_matches(driver.render(forged), self.root, shuffle.ADDRESS))
+        self.assertFalse(report_fixtures.replay(driver.render(forged), self.root, shuffle.ADDRESS))
         with (
             patch.object(sys, 'argv', options + ['--switch-profile', 'two-constants-v2']),
             self.assertRaises(SystemExit),

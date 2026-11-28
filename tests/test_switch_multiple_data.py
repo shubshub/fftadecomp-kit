@@ -321,7 +321,7 @@ class ReportTests(unittest.TestCase):
             control_flow=control_flow, data_profile=True, switches=True, switch_evidence=self.manifest)
         with mock.patch.object(evidence.empty_body, "has_empty_body", return_value=False):
             self.assertTrue(evidence.report_matches(report_fixtures.carried(complete, TASK, BASE), TASK, BASE))
-            self.assertFalse(evidence.report_matches(report, TASK, BASE))
+            self.assertFalse(report_fixtures.replay(report, TASK, BASE))
 
     def test_legacy_single_word_report_remains_valid(self):
         self.body, _, self.manifest, mapping = fixture(1)

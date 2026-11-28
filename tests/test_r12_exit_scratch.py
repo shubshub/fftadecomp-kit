@@ -19,6 +19,7 @@ sys.path.insert(0, str(ROOT / "tests"))
 import match
 import r12_exit_scratch_profile as r12_exit
 import return_scratch_profile as scratch
+import report_fixtures
 
 BASE = match.ROM_BASE
 ESCAPE = scratch.ESCAPE
@@ -390,16 +391,19 @@ class OwnerRouteTests(unittest.TestCase):
             root = owner_fixture(Path(directory) / "owner")
             with patch.dict(os.environ, FFTA_ROM=str(root / "baserom.bin")):
                 result = owner.build(root, A, selector=named.DATAFREE_SELECTOR)
-                report = owner.render(A, result)
+                report = report_fixtures.carried(owner.render(A, result), root, A)
                 recorded = result[1]["proof"]["buffers"]["r12_exit_scratch"]
                 self.assertEqual(len(recorded), 1)
                 self.assertRegex(recorded[0], r"^\* buffer exit scratch r12: `thumb-discarded-exit-scratch-r12-v1` "
                                               r".*; `0x[0-9A-F]{8} r12 -\d+`$")
                 self.assertEqual([line for line in report.splitlines() if line.startswith(r12_exit.FIELD)], recorded)
                 self.assertTrue(match_evidence.report_matches(report, root, A))
-                self.assertFalse(match_evidence.report_matches(report.replace(recorded[0] + "\n", ""), root, A))
-                edited = recorded[0].replace(" r12 -", " r12 -1")
-                self.assertFalse(match_evidence.report_matches(report.replace(recorded[0], edited), root, A))
+                # each refusal is the r12 line's: the standing frame premise check passes both texts
+                dropped = report.replace(recorded[0] + "\n", "")
+                edited = report.replace(recorded[0], recorded[0].replace(" r12 -", " r12 -1"))
+                for refused in (dropped, edited):
+                    report_fixtures.assert_premise_holds(self, refused, root, A)
+                    self.assertFalse(match_evidence.report_matches(refused, root, A))
 
 
 if __name__ == "__main__":

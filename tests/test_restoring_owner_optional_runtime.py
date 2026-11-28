@@ -419,7 +419,7 @@ class CompiledOwnerTests(unittest.TestCase):
         original = source.read_bytes()
         try:
             source.write_bytes(original + b'\n/* changed source identity */\n')
-            self.assertFalse(match_evidence.report_matches(self.report, self.root, A))
+            self.assertFalse(report_fixtures.replay(self.report, self.root, A))
         finally:
             source.write_bytes(original)
 

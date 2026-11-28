@@ -16,6 +16,7 @@ sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import match
+import report_fixtures
 import match_evidence as evidence
 import plain_report_fields as fields
 
@@ -475,7 +476,7 @@ class SavedReportTests(unittest.TestCase):
 
     def replays(self, name, text):
         with patch.dict(os.environ, FFTA_ROM=str(self.roots[name] / "baserom.bin")):
-            return evidence.report_matches(text, self.roots[name], ADDRESS)
+            return report_fixtures.replay(text, self.roots[name], ADDRESS)
 
     @staticmethod
     def schema(text):

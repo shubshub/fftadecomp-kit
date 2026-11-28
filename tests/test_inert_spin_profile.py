@@ -16,6 +16,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import match
+import report_fixtures
 import match_evidence as evidence
 import inert_spin_profile as profile
 
@@ -524,7 +525,7 @@ class CompiledInertSpinTests(unittest.TestCase):
         return json.loads(line.split("`")[1])
 
     def replays(self, report):
-        return evidence.report_matches(report, self.root, A)
+        return report_fixtures.replay(report, self.root, A)
 
     def refusal(self):
         with patch.object(sys, "argv", ["match.py", "--root", str(self.root), "--control-flow-profile",

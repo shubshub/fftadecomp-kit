@@ -322,16 +322,16 @@ class R3CallbackTests(unittest.TestCase):
                              'config/data_symbols.json','baserom.bin'):
                 path = root/relative; prior = path.read_bytes(); path.write_bytes(prior+b' ')
                 try:
-                    with self.subTest(relative=relative): self.assertFalse(evidence.report_matches(report,root,A))
+                    with self.subTest(relative=relative): self.assertFalse(report_fixtures.replay(report,root,A))
                 finally: path.write_bytes(prior)
             header = root/'include/changed.h'; header.write_text('/* synthetic */\n')
-            try: self.assertFalse(evidence.report_matches(report,root,A))
+            try: self.assertFalse(report_fixtures.replay(report,root,A))
             finally: header.unlink()
             with patch.object(profile,'runtime_fingerprint',return_value={'stale':True}):
-                self.assertFalse(evidence.report_matches(report,root,A))
+                self.assertFalse(report_fixtures.replay(report,root,A))
             forged = copy.deepcopy(result); forged['original_elf']=b'replayed unrelated ELF'
-            self.assertFalse(evidence.report_matches(profile.render(forged),root,A))
-            self.assertFalse(evidence.report_matches(report.replace(SELECTOR,profile.DATA_SELECTOR),root,A))
+            self.assertFalse(report_fixtures.replay(profile.render(forged),root,A))
+            self.assertFalse(report_fixtures.replay(report.replace(SELECTOR,profile.DATA_SELECTOR),root,A))
             source = root/'src/08010000.c'
             def change(*args,**kwargs): source.write_text('/* changed during build */\n')
             with patch.object(match,'_run_replay_process',side_effect=change):

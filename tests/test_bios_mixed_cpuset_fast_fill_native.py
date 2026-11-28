@@ -98,7 +98,7 @@ class MixedCpuSetFastFillNativeTests(unittest.TestCase):
                 self.assertIn('buffer callee 0x0814186C: non-leaf calls',
                               check.stdout + check.stderr)
                 (root/'src/08010000.c').write_text(SOURCE + '\n')
-                self.assertFalse(match_evidence.report_matches(report, root, A))
+                self.assertFalse(report_fixtures.replay(report, root, A))
 
 
 if __name__ == '__main__':

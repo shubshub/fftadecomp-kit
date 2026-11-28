@@ -221,7 +221,7 @@ class UnsignedConversionTests(unittest.TestCase):
                 self.assertTrue(old.evidence.report_matches(report_fixtures.carried(report, root, A), root, A))
             (root/'symbols/functions.txt').write_bytes(selected[4]+b' ')
             with patch.object(admission, 'build', side_effect=AssertionError('stale context must not build')):
-                self.assertFalse(old.evidence.report_matches(report, root, A))
+                self.assertFalse(report_fixtures.replay(report, root, A))
 
 
 if __name__ == '__main__':

@@ -193,7 +193,7 @@ class InlineDivisionTests(unittest.TestCase):
             self.assertEqual(admission.selector_for_report(report), admission.INLINE_DIVISION_SELECTOR)
             self.assertTrue(old.evidence.report_matches(report_fixtures.carried(report, root, A), root, A))
             with (root/f'src/{A:08X}.c').open('a') as stream: stream.write('\n')
-            self.assertFalse(old.evidence.report_matches(report, root, A))
+            self.assertFalse(report_fixtures.replay(report, root, A))
 
 
 if __name__ == '__main__':

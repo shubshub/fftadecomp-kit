@@ -104,11 +104,11 @@ class BiosWordSwitchNativeTests(unittest.TestCase):
             (root/'compiler/cli.log').write_text(run.stdout+run.stderr)
             self.assertEqual(run.returncode,0,run.stdout+run.stderr);self.assertIn('MATCH',run.stdout)
             forged=report.replace('native-returned-local-aliases-v1','native-returned-local-aliases-v0')
-            self.assertNotEqual(forged,report);self.assertFalse(match_evidence.report_matches(forged,root,A))
+            self.assertNotEqual(forged,report);self.assertFalse(report_fixtures.replay(forged,root,A))
             source.write_text(SOURCE+'\n')
-            self.assertFalse(match_evidence.report_matches(report,root,A))
+            self.assertFalse(report_fixtures.replay(report,root,A))
             source.write_text(SOURCE)
-            self.assertFalse(match_evidence.report_matches(report.replace(profile.SCHEMA,owner.ACYCLIC_SCHEMA),root,A))
+            self.assertFalse(report_fixtures.replay(report.replace(profile.SCHEMA,owner.ACYCLIC_SCHEMA),root,A))
         (root/'compiler/results.json').write_text(json.dumps(dict(compilation=True,native_build=True,
             native_CLI=True,report_replay=True,forged_report_rejected=True,stale_source_rejected=True,
             legacy_relabel_rejected=True,original_target_run=False),indent=2)+'\n')

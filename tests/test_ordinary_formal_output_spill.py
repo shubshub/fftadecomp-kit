@@ -205,7 +205,7 @@ class ConsumerTests(unittest.TestCase):
             self.assertTrue(match_evidence.report_matches(report_fixtures.carried(report, Path('.'), A), Path('.'), A))
         stale=list(result);stale[2]='different-source'
         with patch.object(owner,'build',return_value=tuple(stale)):
-            self.assertFalse(match_evidence.report_matches(report,Path('.'),A))
+            self.assertFalse(report_fixtures.replay(report,Path('.'),A))
         self.assertIn('conditional returning ordinary ARM ABI',report)
 
 

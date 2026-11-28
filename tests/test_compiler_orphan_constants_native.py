@@ -112,9 +112,9 @@ class NativeTests(unittest.TestCase):
             file=self.root/name;original=file.read_bytes()
             try:
                 file.write_bytes(original+b'\n')
-                self.assertFalse(match_evidence.report_matches(self.report,self.root,A))
+                self.assertFalse(report_fixtures.replay(self.report,self.root,A))
             finally:file.write_bytes(original)
-        self.assertFalse(match_evidence.report_matches(self.report+'* verification: `ordinary`\n',self.root,A))
+        self.assertFalse(report_fixtures.replay(self.report+'* verification: `ordinary`\n',self.root,A))
 
     def test_actual_cli_no_write_and_report_selection(self):
         self.assertTrue(owner.selected(self.report))
@@ -139,7 +139,7 @@ class NativeTests(unittest.TestCase):
             self.assertIn('refused: 0x08001000 is outside every library unit; the fixed-O0 orphan-constant '
                 'selector is admitted only inside an agbcc-O0-v1 unit',result.stderr)
             self.assertNotIn('verdict MATCH - byte identical',result.stdout.splitlines())
-            self.assertFalse(match_evidence.report_matches(self.report,self.root,A))
+            self.assertFalse(report_fixtures.replay(self.report,self.root,A))
         finally:(self.root/units.TABLE).write_bytes(self.table)
         self.assertTrue(match_evidence.report_matches(report_fixtures.carried(self.report, self.root, A), self.root, A))
 

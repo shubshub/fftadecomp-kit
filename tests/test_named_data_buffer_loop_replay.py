@@ -357,7 +357,7 @@ class NativeTests(unittest.TestCase):
             # A forged replay line on a report without a replay fails replay.
             (line,) = [line for line in self.report.splitlines() if line.startswith('* buffer loop replay')]
             evidence = next(row for row in report.splitlines() if row.startswith('* owner runtime evidence: '))
-            self.assertFalse(match_evidence.report_matches(
+            self.assertFalse(report_fixtures.replay(
                 report.replace(evidence, line + '\n' + evidence), self.straight, A))
 
     def test_too_small_local_refuses_at_the_exact_store(self):
@@ -389,7 +389,7 @@ class NativeTests(unittest.TestCase):
         for edited in edits:
             with self.subTest(edit=edits.index(edited)):
                 self.assertNotEqual(edited, self.report)
-                self.assertFalse(match_evidence.report_matches(edited, self.root, A))
+                self.assertFalse(report_fixtures.replay(edited, self.root, A))
         self.assertTrue(match_evidence.report_matches(report_fixtures.carried(self.report, self.root, A), self.root, A))
 
     def test_replay_record_is_required_and_exact(self):

@@ -17,6 +17,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import match
+import report_fixtures
 import match_evidence as evidence
 import owner_admission_profile as owner
 import signed_divmod_profile as profile
@@ -297,15 +298,15 @@ class SignedDivmodTests(unittest.TestCase):
 
     def test_forged_rehashed_report_and_mixed_schema_refused(self):
         report = profile.render(profile.build(self.root, A))
-        self.assertFalse(evidence.report_matches(report.replace(profile.SCHEMA, profile.quotient.SCHEMA), self.root, A))
-        self.assertFalse(evidence.report_matches(report + f'* verification: `{profile.quotient.SCHEMA}`\n', self.root, A))
+        self.assertFalse(report_fixtures.replay(report.replace(profile.SCHEMA, profile.quotient.SCHEMA), self.root, A))
+        self.assertFalse(report_fixtures.replay(report + f'* verification: `{profile.quotient.SCHEMA}`\n', self.root, A))
         prefix = '* signed runtime evidence: `'
         line = next(row for row in report.splitlines() if row.startswith(prefix))
         saved = json.loads(line[len(prefix):-1]); saved['manifest']['frame']['preserved'] = 'assumed'
         changed = profile.text(saved)
         forged = report.replace(line, prefix + changed + '`')
         forged = rehash_report(forged, changed)
-        self.assertFalse(evidence.report_matches(forged, self.root, A))
+        self.assertFalse(report_fixtures.replay(forged, self.root, A))
 
 
 def rehash_report(report, encoded):

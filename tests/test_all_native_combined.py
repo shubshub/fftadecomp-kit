@@ -14,6 +14,7 @@ HERE = Path(__file__).resolve().parents[1]
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(HERE / 'tools'))
 import match
+import report_fixtures
 import match_evidence as evidence
 import owner_admission_profile as owner
 import local_long_branch_profile as frame
@@ -167,9 +168,9 @@ class MergedNativeTests(unittest.TestCase):
             with support.tree(env) as root, support.build_mocks(env, root):
                 report = owner.render(env['address'], owner.build(root, env['address'], selector=env['selector']))
                 stale = report.replace('"source_sha256":"', '"source_sha256":"stale', 1)
-                self.assertFalse(evidence.report_matches(stale, root, env['address']))
+                self.assertFalse(report_fixtures.replay(stale, root, env['address']))
                 (root / 'include/fixture.h').write_bytes(b'new combined fixture header\n')
-                self.assertFalse(evidence.report_matches(report, root, env['address']))
+                self.assertFalse(report_fixtures.replay(report, root, env['address']))
 
     def test_live_alias_effect_and_saved_frame_refusals_still_apply(self):
         for case in (dict(missing_init=True), dict(bad_consumer=True), dict(extra_call=True)):
